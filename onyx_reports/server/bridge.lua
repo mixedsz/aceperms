@@ -41,9 +41,12 @@ end)
 function IsAdmin(source)
     local src = tostring(source)
 
-    -- Ace permission check (works universally)
-    if IsPlayerAceAllowed(src, Config.AcePermission) then return true end
+    -- Optional ace permission check
+    if Config.UseAcePerms then
+        return IsPlayerAceAllowed(src, Config.AcePermission)
+    end
 
+    -- Group / job-based check
     local groups = Config.AdminGroups
 
     if FrameworkName == 'esx' and Framework then

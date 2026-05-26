@@ -10,18 +10,20 @@ Config.Framework = 'auto'
 -- ┌──────────────────────────────────────────────────────────┐
 -- │                  ADMIN PERMISSIONS                       │
 -- │                                                          │
--- │  Option 1 — Ace permissions (recommended):              │
+-- │  UseAcePerms = false  → groups below are used           │
+-- │  UseAcePerms = true   → ace permission node is used     │
 -- │    add_principal identifier.steam:XXXXXX group.admin     │
 -- │    add_ace group.admin reports.admin allow               │
--- │                                                          │
--- │  Option 2 — Job / group names below (fallback)          │
 -- └──────────────────────────────────────────────────────────┘
+Config.UseAcePerms   = false
 Config.AcePermission = 'reports.admin'
 
+-- Groups that can access /reports (used when UseAcePerms = false)
+-- Add or remove group names to match your server setup
 Config.AdminGroups = {
-    esx    = { 'admin', 'superadmin', 'mod', 'moderator' },
-    qbcore = { 'admin', 'god',        'mod', 'moderator' },
-    qbox   = { 'admin', 'god',        'mod', 'moderator' },
+    esx    = { 'admin', 'owner', 'support' },
+    qbcore = { 'admin', 'owner', 'support' },
+    qbox   = { 'admin', 'owner', 'support' },
 }
 
 -- ┌──────────────────────────────────────────────────────────┐
