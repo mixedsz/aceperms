@@ -1,6 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- In-memory report store
--- Reports persist for the lifetime of the server session.
 -- ─────────────────────────────────────────────────────────────────────────────
 local Reports   = {}
 local Counter   = 0
@@ -11,25 +10,42 @@ local function NewID()
     return ('RPT-%04d'):format(Counter)
 end
 
+local function ReportList()
+    local t = {}
+    for _, r in pairs(Reports) do t[#t + 1] = r end
+    return t
+end
+
 -- ─────────────────────────────────────────────────────────────────────────────
--- /report — open submission UI
+-- /report  — opens the panel for a player (My Reports tab)
 -- ─────────────────────────────────────────────────────────────────────────────
 RegisterCommand(Config.Commands.user, function(source)
-    local src  = tonumber(source)
-    local now  = os.time()
-    local last = Cooldowns[src]
+    local src = tonumber(source)
+    local now = os.time()
 
-    if last and (now - last) < Config.Cooldown then
-        local remaining = Config.Cooldown - (now - last)
-        NotifyPlayer(src, Config.Locale.report_cooldown:format(remaining), 'error')
+    if Cooldowns[src] and (now - Cooldowns[src]) < Config.Cooldown then
+        local rem = Config.Cooldown - (now - Cooldowns[src])
+        NotifyPlayer(src, Config.Locale.report_cooldown:format(rem), 'error')
         return
     end
 
-    TriggerClientEvent('onyx_reports:openUserUI', src)
+    -- Collect this player's own reports
+    local mine = {}
+    for _, r in pairs(Reports) do
+        if r.source == src then mine[#mine + 1] = r end
+    end
+
+    TriggerClientEvent('onyx_reports:openPanel', src, {
+        isAdmin    = IsAdmin(src),
+        defaultTab = 'my-reports',
+        categories = Config.Categories,
+        myReports  = mine,
+        reports    = IsAdmin(src) and ReportList() or nil,
+    })
 end, false)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- /reports — open admin panel
+-- /reports — opens the panel for admins (Admin Panel tab)
 -- ─────────────────────────────────────────────────────────────────────────────
 RegisterCommand(Config.Commands.admin, function(source)
     local src = tonumber(source)
@@ -39,9 +55,12 @@ RegisterCommand(Config.Commands.admin, function(source)
         return
     end
 
-    local list = {}
-    for _, r in pairs(Reports) do list[#list + 1] = r end
-    TriggerClientEvent('onyx_reports:openAdminUI', src, list)
+    TriggerClientEvent('onyx_reports:openPanel', src, {
+        isAdmin    = true,
+        defaultTab = 'admin',
+        categories = Config.Categories,
+        reports    = ReportList(),
+    })
 end, false)
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -62,28 +81,30 @@ RegisterNetEvent('onyx_reports:createReport', function(data)
     local id     = NewID()
     local name   = GetDisplayName(src)
     local report = {
-        id           = id,
-        source       = src,
-        playerName   = name,
-        category     = data.category,
-        categoryLabel= data.categoryLabel or data.category,
-        description  = data.description,
-        targetName   = data.targetName or nil,
-        status       = 'open',
-        handledBy    = nil,
-        closedBy     = nil,
-        closeReason  = nil,
-        playerOnline = true,
-        createdAt    = os.time(),
-        messages     = {},
+        id            = id,
+        source        = src,
+        playerName    = name,
+        category      = data.category,
+        categoryLabel = data.categoryLabel or data.category,
+        description   = data.description,
+        targetName    = data.targetName or nil,
+        priority      = 'normal',
+        status        = 'open',
+        handledBy     = nil,
+        closedBy      = nil,
+        closeReason   = nil,
+        closedAt      = nil,
+        playerOnline  = true,
+        createdAt     = os.time(),
+        messages      = {},
+        adminNotes    = {},
     }
 
     Reports[id] = report
 
     NotifyPlayer(src, Config.Locale.report_submitted, 'success')
-    NotifyAdmins(('New report [%s] from %s — %s'):format(id, name, report.categoryLabel), 'inform')
+    NotifyAdmins(('New %s report [%s] from %s'):format(report.categoryLabel, id, name), 'inform')
 
-    -- Push to all open admin UIs
     TriggerClientEvent('onyx_reports:reportCreated', -1, report)
 
     if Config.DiscordWebhook ~= '' then
@@ -101,9 +122,9 @@ RegisterNetEvent('onyx_reports:handleReport', function(reportId)
     local report = Reports[reportId]
     if not report or report.status ~= 'open' then return end
 
-    report.status        = 'active'
-    report.handledBy     = GetDisplayName(src)
-    report.handledBySrc  = src
+    report.status       = 'active'
+    report.handledBy    = GetDisplayName(src)
+    report.handledBySrc = src
 
     TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
 
@@ -113,7 +134,7 @@ RegisterNetEvent('onyx_reports:handleReport', function(reportId)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Close report
+-- Close / resolve report
 -- ─────────────────────────────────────────────────────────────────────────────
 RegisterNetEvent('onyx_reports:closeReport', function(reportId, reason)
     local src    = tonumber(source)
@@ -135,7 +156,7 @@ RegisterNetEvent('onyx_reports:closeReport', function(reportId, reason)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Admin → Player message
+-- Admin → Player chat message
 -- ─────────────────────────────────────────────────────────────────────────────
 RegisterNetEvent('onyx_reports:sendMessage', function(reportId, message)
     local src    = tonumber(source)
@@ -161,36 +182,72 @@ RegisterNetEvent('onyx_reports:sendMessage', function(reportId, message)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Player disconnect
+-- Admin Note (internal only, never shown to reporter)
+-- ─────────────────────────────────────────────────────────────────────────────
+RegisterNetEvent('onyx_reports:addAdminNote', function(reportId, note)
+    local src    = tonumber(source)
+    if not IsAdmin(src) then return end
+
+    local report = Reports[reportId]
+    if not report then return end
+    if not note or #note < 1 then return end
+
+    local noteData = {
+        sender    = GetDisplayName(src),
+        message   = note,
+        timestamp = os.time(),
+    }
+
+    table.insert(report.adminNotes, noteData)
+    TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
+end)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Set priority
+-- ─────────────────────────────────────────────────────────────────────────────
+RegisterNetEvent('onyx_reports:setPriority', function(reportId, priority)
+    local src    = tonumber(source)
+    if not IsAdmin(src) then return end
+
+    local valid = { low = true, normal = true, high = true, urgent = true }
+    if not valid[priority] then return end
+
+    local report = Reports[reportId]
+    if not report then return end
+
+    report.priority = priority
+    TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
+end)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Player disconnect — mark reports as offline
 -- ─────────────────────────────────────────────────────────────────────────────
 AddEventHandler('playerDropped', function()
     local src = tonumber(source)
     for _, report in pairs(Reports) do
-        if report.source == src then
-            report.playerOnline = false
-        end
+        if report.source == src then report.playerOnline = false end
     end
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Discord webhook helper
+-- Discord webhook
 -- ─────────────────────────────────────────────────────────────────────────────
 function SendToDiscord(report)
-    local body = json.encode({
-        embeds = {{
-            title       = ('[%s] New Report — %s'):format(report.id, report.categoryLabel),
-            description = report.description,
-            color       = 9109504, -- purple
-            fields      = {
-                { name = 'Reporter',  value = report.playerName,  inline = true  },
-                { name = 'Category',  value = report.categoryLabel, inline = true },
-                { name = 'Server ID', value = tostring(report.source), inline = true },
-            },
-            footer    = { text = 'Onyx Reports' },
-            timestamp = os.date('!%Y-%m-%dT%H:%M:%SZ'),
-        }},
-    })
-
-    PerformHttpRequest(Config.DiscordWebhook,
-        function() end, 'POST', body, { ['Content-Type'] = 'application/json' })
+    PerformHttpRequest(Config.DiscordWebhook, function() end, 'POST',
+        json.encode({
+            embeds = {{
+                title       = ('[%s] %s — %s'):format(report.id, report.categoryLabel, report.playerName),
+                description = report.description,
+                color       = 9109504,
+                fields      = {
+                    { name = 'Category',  value = report.categoryLabel,     inline = true },
+                    { name = 'Reporter',  value = report.playerName,        inline = true },
+                    { name = 'Server ID', value = tostring(report.source),  inline = true },
+                },
+                footer    = { text = 'Onyx Reports' },
+                timestamp = os.date('!%Y-%m-%dT%H:%M:%SZ'),
+            }},
+        }),
+        { ['Content-Type'] = 'application/json' }
+    )
 end
