@@ -34,7 +34,7 @@ function Notify(message, nType)
 
     -- ox_lib (works with all frameworks when installed)
     if GetResourceState('ox_lib') == 'started' then
-        lib.notify({ title = 'Reports', description = message, type = nType })
+        exports.ox_lib:notify({ title = 'Reports', description = message, type = nType })
         return
     end
 

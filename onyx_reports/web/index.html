@@ -337,6 +337,56 @@
   <!-- ═══════════════════════════════════════════════
        CLOSE REASON PROMPT
   ════════════════════════════════════════════════ -->
+  <!-- ═══════════════════════════════════════════════
+       CLAIM CONFIRM MODAL
+  ════════════════════════════════════════════════ -->
+  <div id="claim-prompt" class="float-card hidden" style="max-width:420px;">
+    <div class="sf-hdr">
+      <div class="sf-hdr-left">
+        <div class="sf-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+               fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+        </div>
+        <div>
+          <div class="sf-title">Claim Report</div>
+          <div class="sf-sub">Choose how to connect with the reporter</div>
+        </div>
+      </div>
+      <button class="hdr-btn" id="claim-prompt-x">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+             fill="none" stroke="currentColor" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+    <div class="sf-body">
+      <div class="claim-options">
+        <button class="claim-opt" id="claim-goto">
+          <div class="claim-opt-icon">🚀</div>
+          <div class="claim-opt-body">
+            <div class="claim-opt-title">Go to Player</div>
+            <div class="claim-opt-sub">Teleport yourself to the reporter's location</div>
+          </div>
+        </button>
+        <button class="claim-opt" id="claim-bring">
+          <div class="claim-opt-icon">📍</div>
+          <div class="claim-opt-body">
+            <div class="claim-opt-title">Bring Player</div>
+            <div class="claim-opt-sub">Teleport the reporter to your location</div>
+          </div>
+        </button>
+      </div>
+    </div>
+    <div class="sf-footer">
+      <button class="btn btn-ghost" id="claim-cancel">Cancel</button>
+    </div>
+  </div>
+
   <div id="close-prompt" class="float-card hidden" style="max-width:400px;">
     <div class="sf-hdr">
       <div class="sf-hdr-left">

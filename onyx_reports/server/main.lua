@@ -16,6 +16,10 @@ local function ReportList()
     return t
 end
 
+local function IsPlayerConnected(src)
+    return GetPlayerPing(tonumber(src)) >= 0
+end
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Character name — tries framework first, then oxmysql, then FiveM name
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -191,8 +195,10 @@ RegisterNetEvent('onyx_reports:createReport', function(data)
         -- NUI toast on all admin screens (no focus)
         NotifyAdminsNUI(id, charName, report.categoryLabel)
 
-        -- Real-time list update
+        -- Real-time list update (all clients get it for admin panels)
         TriggerClientEvent('onyx_reports:reportCreated', -1, report)
+        -- Only the reporter gets it for their My Reports tab
+        TriggerClientEvent('onyx_reports:yourReportCreated', src, report)
 
         if Config.DiscordWebhook ~= '' then
             SendToDiscord(report)
@@ -201,9 +207,9 @@ RegisterNetEvent('onyx_reports:createReport', function(data)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Handle (claim) report
+-- Handle (claim) report  — action: 'goto' | 'bring'
 -- ─────────────────────────────────────────────────────────────────────────────
-RegisterNetEvent('onyx_reports:handleReport', function(reportId)
+RegisterNetEvent('onyx_reports:handleReport', function(reportId, action)
     local src    = tonumber(source)
     if not IsAdmin(src) then return end
 
@@ -217,8 +223,25 @@ RegisterNetEvent('onyx_reports:handleReport', function(reportId)
 
         TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
 
-        if report.source and NetworkIsPlayerActive(report.source) then
+        if report.source and IsPlayerConnected(report.source) then
             NotifyPlayer(report.source, Config.Locale.report_handled, 'inform')
+        end
+
+        -- Teleportation
+        if action == 'goto' then
+            local ped = GetPlayerPed(report.source)
+            if ped and ped ~= 0 then
+                local c = GetEntityCoords(ped)
+                TriggerClientEvent('onyx_reports:teleport', src, c.x, c.y, c.z)
+            end
+        elseif action == 'bring' then
+            local ped = GetPlayerPed(src)
+            if ped and ped ~= 0 then
+                local c = GetEntityCoords(ped)
+                if report.source and IsPlayerConnected(report.source) then
+                    TriggerClientEvent('onyx_reports:teleport', report.source, c.x, c.y, c.z)
+                end
+            end
         end
     end)
 end)
@@ -241,7 +264,7 @@ RegisterNetEvent('onyx_reports:closeReport', function(reportId, reason)
 
         TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
 
-        if report.source and NetworkIsPlayerActive(report.source) then
+        if report.source and IsPlayerConnected(report.source) then
             NotifyPlayer(report.source, Config.Locale.report_closed_msg:format(report.closeReason), 'inform')
         end
     end)
@@ -269,7 +292,7 @@ RegisterNetEvent('onyx_reports:sendMessage', function(reportId, message)
         table.insert(report.messages, msgData)
         TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
 
-        if report.source and NetworkIsPlayerActive(report.source) then
+        if report.source and IsPlayerConnected(report.source) then
             TriggerClientEvent('onyx_reports:receiveMessage', report.source, reportId, msgData)
         end
     end)

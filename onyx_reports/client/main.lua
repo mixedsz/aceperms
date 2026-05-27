@@ -34,6 +34,11 @@ RegisterNetEvent('onyx_reports:reportCreated', function(report)
     SendNUIMessage({ action = 'reportCreated', report = report })
 end)
 
+RegisterNetEvent('onyx_reports:yourReportCreated', function(report)
+    if not UIOpen then return end
+    SendNUIMessage({ action = 'yourReportCreated', report = report })
+end)
+
 RegisterNetEvent('onyx_reports:reportUpdated', function(report)
     if not UIOpen then return end
     SendNUIMessage({ action = 'reportUpdated', report = report })
@@ -71,9 +76,13 @@ RegisterNUICallback('submitReport', function(data, cb)
     cb({ ok = true })
 end)
 
-RegisterNUICallback('handleReport', function(data, cb)
-    TriggerServerEvent('onyx_reports:handleReport', data.reportId)
+RegisterNUICallback('claimReport', function(data, cb)
+    TriggerServerEvent('onyx_reports:handleReport', data.reportId, data.action)
     cb({ ok = true })
+end)
+
+RegisterNetEvent('onyx_reports:teleport', function(x, y, z)
+    SetEntityCoords(PlayerPedId(), x, y, z, false, false, false, false)
 end)
 
 RegisterNUICallback('closeReport', function(data, cb)

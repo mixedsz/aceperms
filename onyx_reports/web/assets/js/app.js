@@ -72,13 +72,14 @@ const S = {
 ════════════════════════════════════════════════════════════ */
 window.addEventListener('message', ({ data }) => {
   switch (data.action) {
-    case 'openPanel':          openPanel(data);                         break;
-    case 'reportCreated':      onReportCreated(data.report);            break;
-    case 'reportUpdated':      onReportUpdated(data.report);            break;
+    case 'openPanel':          openPanel(data);                          break;
+    case 'reportCreated':      onReportCreated(data.report);             break;
+    case 'yourReportCreated':  onYourReportCreated(data.report);         break;
+    case 'reportUpdated':      onReportUpdated(data.report);             break;
     case 'receiveMessage':     onReceiveMsg(data.reportId, data.message);break;
-    case 'closeUI':            closeAll();                              break;
-    case 'setThemeColor':      applyThemeColor(data.color);             break;
-    case 'adminNotification':  showAdminToast(data.data);               break;
+    case 'closeUI':            closeAll();                               break;
+    case 'setThemeColor':      applyThemeColor(data.color);              break;
+    case 'adminNotification':  showAdminToast(data.data);                break;
   }
 });
 
@@ -426,7 +427,7 @@ function renderAdminDetail(r) {
     btnClaim.innerHTML = `✓ Claimed`;
   }
 
-  btnClaim.onclick   = () => { if (r.status === 'open') nuiFetch('handleReport', { reportId: r.id }); };
+  btnClaim.onclick   = () => { if (r.status === 'open') openClaimPrompt(r.id); };
   btnResolve.onclick = () => { if (r.status !== 'closed') openClosePrompt(r.id); };
   btnDelete.onclick  = () => { nuiFetch('closeReport', { reportId: r.id, reason: 'Deleted by staff' }); };
 }
@@ -779,6 +780,37 @@ function closeSubmitForm() {
 
 
 /* ════════════════════════════════════════════════════════════
+   CLAIM CONFIRM PROMPT
+════════════════════════════════════════════════════════════ */
+let pendingClaimId = null;
+
+function openClaimPrompt(reportId) {
+  pendingClaimId = reportId;
+  document.getElementById('claim-prompt').classList.remove('hidden');
+}
+
+function closeClaimPrompt() {
+  document.getElementById('claim-prompt').classList.add('hidden');
+  pendingClaimId = null;
+}
+
+document.getElementById('claim-prompt-x').addEventListener('click', closeClaimPrompt);
+document.getElementById('claim-cancel')   .addEventListener('click', closeClaimPrompt);
+
+document.getElementById('claim-goto').addEventListener('click', () => {
+  if (!pendingClaimId) return;
+  nuiFetch('claimReport', { reportId: pendingClaimId, action: 'goto' });
+  closeClaimPrompt();
+});
+
+document.getElementById('claim-bring').addEventListener('click', () => {
+  if (!pendingClaimId) return;
+  nuiFetch('claimReport', { reportId: pendingClaimId, action: 'bring' });
+  closeClaimPrompt();
+});
+
+
+/* ════════════════════════════════════════════════════════════
    CLOSE REASON PROMPT
 ════════════════════════════════════════════════════════════ */
 function openClosePrompt(reportId) {
@@ -811,9 +843,14 @@ function onReportCreated(r) {
   if (S.activeTab === 'admin') renderAdminList();
 }
 
+function onYourReportCreated(r) {
+  S.myReports[r.id] = r;
+  if (S.activeTab === 'my-reports') renderMyList();
+}
+
 function onReportUpdated(r) {
   S.allReports[r.id] = r;
-  if (S.myReports[r.id]) S.myReports[r.id] = r;
+  if (S.myReports[r.id] !== undefined) S.myReports[r.id] = r;
 
   if (S.activeTab === 'admin') {
     renderAdminList();
@@ -842,9 +879,11 @@ document.getElementById('close-panel').addEventListener('click', () => {
 });
 
 function closeAll() {
-  document.getElementById('main-panel')  .classList.add('hidden');
-  document.getElementById('submit-form') .classList.add('hidden');
-  document.getElementById('close-prompt').classList.add('hidden');
+  document.getElementById('main-panel')   .classList.add('hidden');
+  document.getElementById('submit-form')  .classList.add('hidden');
+  document.getElementById('close-prompt') .classList.add('hidden');
+  document.getElementById('claim-prompt') .classList.add('hidden');
+  pendingClaimId = null;
 }
 
 
