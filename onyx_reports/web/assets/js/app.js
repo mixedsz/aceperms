@@ -29,22 +29,42 @@ const nuiFetch = (cb, body = {}) =>
     body   : JSON.stringify(body),
   }).catch(() => {});
 
+/* ── Theme color ──────────────────────────────────────────── */
+function applyThemeColor(hex) {
+  if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) return;
+  const r = parseInt(hex.slice(1,3), 16);
+  const g = parseInt(hex.slice(3,5), 16);
+  const b = parseInt(hex.slice(5,7), 16);
+  const dr = Math.max(0, Math.floor(r * 0.80));
+  const dg = Math.max(0, Math.floor(g * 0.80));
+  const db = Math.max(0, Math.floor(b * 0.80));
+  const accentD = '#' + [dr,dg,db].map(v => v.toString(16).padStart(2,'0')).join('');
+  const root = document.documentElement;
+  root.style.setProperty('--accent',       hex);
+  root.style.setProperty('--accent-d',     accentD);
+  root.style.setProperty('--accent-bg',    `rgba(${r},${g},${b},0.14)`);
+  root.style.setProperty('--accent-bd',    `rgba(${r},${g},${b},0.28)`);
+  root.style.setProperty('--bd-focus',     `rgba(${r},${g},${b},0.65)`);
+  root.style.setProperty('--accent-glow',  `rgba(${r},${g},${b},0.35)`);
+}
+
 /* ── State ────────────────────────────────────────────────── */
 const S = {
-  isAdmin      : false,
-  categories   : [],
-  myReports    : {},
-  allReports   : {},
-  selectedMy   : null,
-  selectedAdmin: null,
-  activeTab    : 'my-reports',
-  activeFilter : 'all',
+  isAdmin        : false,
+  categories     : [],
+  priorities     : [],
+  myReports      : {},
+  allReports     : {},
+  selectedMy     : null,
+  selectedAdmin  : null,
+  activeTab      : 'my-reports',
+  activeFilter   : 'all',
   activeCatFilter: 'all',
-  searchQuery  : '',
-  showResolved : false,
-  activeMsgTab : 'chat',
-  selectedCat  : null,
-  pendingClose : null,
+  searchQuery    : '',
+  showResolved   : false,
+  activeMsgTab   : 'chat',
+  selectedCat    : null,
+  pendingClose   : null,
 };
 
 /* ════════════════════════════════════════════════════════════
@@ -52,13 +72,51 @@ const S = {
 ════════════════════════════════════════════════════════════ */
 window.addEventListener('message', ({ data }) => {
   switch (data.action) {
-    case 'openPanel':     openPanel(data);              break;
-    case 'reportCreated': onReportCreated(data.report); break;
-    case 'reportUpdated': onReportUpdated(data.report); break;
-    case 'receiveMessage':onReceiveMsg(data.reportId, data.message); break;
-    case 'closeUI':       closeAll();                   break;
+    case 'openPanel':          openPanel(data);                         break;
+    case 'reportCreated':      onReportCreated(data.report);            break;
+    case 'reportUpdated':      onReportUpdated(data.report);            break;
+    case 'receiveMessage':     onReceiveMsg(data.reportId, data.message);break;
+    case 'closeUI':            closeAll();                              break;
+    case 'setThemeColor':      applyThemeColor(data.color);             break;
+    case 'adminNotification':  showAdminToast(data.data);               break;
   }
 });
+
+/* ════════════════════════════════════════════════════════════
+   ADMIN NOTIFICATION TOAST  (no NUI focus — appears over game)
+════════════════════════════════════════════════════════════ */
+function showAdminToast(data) {
+  if (!data) return;
+  const area  = document.getElementById('notif-area');
+  const toast = document.createElement('div');
+  toast.className = 'notif-toast';
+
+  toast.innerHTML = `
+    <div class="notif-icon">🔔</div>
+    <div class="notif-body">
+      <div class="notif-title">New Report Submitted</div>
+      <div class="notif-reporter">${esc(data.playerName ?? 'Unknown')}</div>
+      <div class="notif-cat">${esc(data.category ?? 'Report')}</div>
+      <div class="notif-hint">Type <code>/reports</code> to manage</div>
+    </div>
+    <button class="notif-close" aria-label="Dismiss">
+      <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24"
+           fill="none" stroke="currentColor" stroke-width="2.5"
+           stroke-linecap="round" stroke-linejoin="round">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+    </button>
+    <div class="notif-progress"></div>`;
+
+  const dismiss = () => {
+    toast.classList.add('removing');
+    setTimeout(() => toast.remove(), 300);
+  };
+
+  toast.querySelector('.notif-close').addEventListener('click', dismiss);
+  area.appendChild(toast);
+  setTimeout(dismiss, 5200);
+}
 
 /* ════════════════════════════════════════════════════════════
    OPEN PANEL
@@ -67,30 +125,28 @@ function openPanel(data) {
   S.isAdmin   = !!data.isAdmin;
   S.activeTab = data.defaultTab ?? 'my-reports';
 
-  // Populate categories in filter dropdown
+  if (data.uiColor) applyThemeColor(data.uiColor);
+
   if (data.categories) {
     S.categories = data.categories;
     const catSel = document.getElementById('f-category');
     catSel.innerHTML = '<option value="all">All Categories</option>';
     S.categories.forEach(c => {
       const o = document.createElement('option');
-      o.value = c.id;
+      o.value       = c.id;
       o.textContent = c.label;
       catSel.appendChild(o);
     });
   }
 
-  // Show/hide admin-only tabs
+  if (data.priorities) S.priorities = data.priorities;
+
   document.querySelectorAll('.admin-only').forEach(el =>
     el.classList.toggle('hidden', !S.isAdmin));
 
-  // Load report data
   S.allReports = {};
   S.myReports  = {};
-  (data.reports ?? []).forEach(r => {
-    S.allReports[r.id] = r;
-    if (data.mySource && r.source === data.mySource) S.myReports[r.id] = r;
-  });
+  (data.reports ?? []).forEach(r => { S.allReports[r.id] = r; });
   if (data.myReports) data.myReports.forEach(r => { S.myReports[r.id] = r; });
 
   switchTab(S.activeTab);
@@ -166,12 +222,14 @@ function selectMyReport(id) {
   if (!r) return;
 
   const pane    = document.getElementById('my-detail-pane');
-  const empty   = pane.querySelector('.detail-empty-state');
+  const empty   = document.getElementById('my-empty');
   const content = document.getElementById('my-detail-content');
 
-  empty.classList.add('hidden');
-  content.classList.remove('hidden');
-  content.innerHTML = buildPlayerDetail(r);
+  if (empty)   empty.classList.add('hidden');
+  if (content) {
+    content.classList.remove('hidden');
+    content.innerHTML = buildPlayerDetail(r);
+  }
 }
 
 function buildPlayerDetail(r) {
@@ -183,10 +241,12 @@ function buildPlayerDetail(r) {
 
   return `
     <div class="detail-hdr">
-      <div class="detail-hdr-badges">
-        <span class="pill pill-${r.status}">${statusLabel(r.status)}</span>
-        <span class="pill pill-${r.priority ?? 'normal'}">${capitalize(r.priority ?? 'Normal')}</span>
-        <span class="pill pill-cat">${esc(r.categoryLabel ?? r.category)}</span>
+      <div class="detail-hdr-top">
+        <div class="detail-hdr-badges">
+          <span class="pill pill-${r.status}">${statusLabel(r.status)}</span>
+          <span class="pill pill-${r.priority ?? 'normal'}">${priorityLabel(r.priority ?? 'normal')}</span>
+          <span class="pill pill-cat">${esc(r.categoryLabel ?? r.category)}</span>
+        </div>
       </div>
       <h2 class="detail-title">${esc(r.categoryLabel ?? r.category)} — ${esc(r.id)}</h2>
       <div class="detail-meta-row">
@@ -214,7 +274,7 @@ function renderAdminList() {
   const list = document.getElementById('admin-report-list');
   let reports = Object.values(S.allReports);
 
-  if (S.activeFilter !== 'all')   reports = reports.filter(r => r.status === S.activeFilter);
+  if (S.activeFilter !== 'all')    reports = reports.filter(r => r.status   === S.activeFilter);
   if (S.activeCatFilter !== 'all') reports = reports.filter(r => r.category === S.activeCatFilter);
   if (S.searchQuery)               reports = reports.filter(r =>
     r.playerName?.toLowerCase().includes(S.searchQuery));
@@ -239,7 +299,7 @@ function renderAdminList() {
 }
 
 function buildCard(r, mode) {
-  const el = document.createElement('div');
+  const el  = document.createElement('div');
   el.className = `r-card${(mode==='admin'?S.selectedAdmin:S.selectedMy)===r.id?' active':''}`;
   el.dataset.id = r.id;
 
@@ -248,7 +308,7 @@ function buildCard(r, mode) {
   el.innerHTML = `
     <div class="rc-top">
       <span class="rc-id">${esc(r.id)}</span>
-      <span class="pill pill-${prio}">${capitalize(prio)}</span>
+      <span class="pill pill-${prio}">${priorityLabel(prio)}</span>
       <span class="pill pill-${r.status}">${statusLabel(r.status)}</span>
     </div>
     <div class="rc-title">${esc(r.categoryLabel ?? r.category)}</div>
@@ -290,8 +350,13 @@ function selectAdminReport(id) {
   const r = S.allReports[id];
   if (!r) return;
 
-  document.getElementById('admin-empty').classList.add('hidden');
-  document.getElementById('admin-detail-content').classList.remove('hidden');
+  document.getElementById('admin-empty')          .classList.add('hidden');
+  document.getElementById('admin-detail-content') .classList.remove('hidden');
+
+  // Reset to chat tab
+  document.querySelectorAll('.msg-tab').forEach(b => b.classList.toggle('active', b.dataset.msgtab === 'chat'));
+  document.getElementById('msg-view-chat') .classList.remove('hidden');
+  document.getElementById('msg-view-notes').classList.add('hidden');
 
   renderAdminDetail(r);
 }
@@ -299,13 +364,16 @@ function selectAdminReport(id) {
 function renderAdminDetail(r) {
   const prio   = r.priority ?? 'normal';
   const online = r.playerOnline !== false;
-  const init   = (r.playerName ?? 'U')[0].toUpperCase();
 
   // Badges
   document.getElementById('d-badges').innerHTML = `
     <span class="pill pill-${r.status}">${statusLabel(r.status)}</span>
-    <span class="pill pill-${prio}">${capitalize(prio)}</span>
+    <span class="pill pill-${prio}">${priorityLabel(prio)}</span>
     <span class="pill pill-cat">${esc(r.categoryLabel ?? r.category)}</span>`;
+
+  // Priority selector — set current label and wire dropdown
+  document.getElementById('prio-label').textContent = priorityLabel(prio);
+  wirePrioDropdown(r.id);
 
   // Title
   document.getElementById('d-title').textContent =
@@ -338,7 +406,7 @@ function renderAdminDetail(r) {
   // Description
   document.getElementById('d-desc').textContent = r.description;
 
-  // Messages
+  // Messages + count badges
   renderMsgTabs(r);
 
   // Action buttons
@@ -346,23 +414,56 @@ function renderAdminDetail(r) {
   const btnResolve = document.getElementById('btn-resolve');
   const btnDelete  = document.getElementById('btn-delete');
 
+  btnClaim.disabled   = false;
+  btnResolve.disabled = false;
+  btnClaim.innerHTML  = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Claim`;
+
   if (r.status === 'closed') {
     btnClaim.disabled   = true;
     btnResolve.disabled = true;
   } else if (r.status === 'active') {
-    btnClaim.disabled   = true;
-    btnClaim.innerHTML  = `✓ Claimed`;
-    btnResolve.disabled = false;
-  } else {
-    btnClaim.disabled   = false;
-    btnClaim.innerHTML  = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg> Claim`;
-    btnResolve.disabled = false;
+    btnClaim.disabled  = true;
+    btnClaim.innerHTML = `✓ Claimed`;
   }
 
   btnClaim.onclick   = () => { if (r.status === 'open') nuiFetch('handleReport', { reportId: r.id }); };
   btnResolve.onclick = () => { if (r.status !== 'closed') openClosePrompt(r.id); };
   btnDelete.onclick  = () => { nuiFetch('closeReport', { reportId: r.id, reason: 'Deleted by staff' }); };
 }
+
+/* ── Priority dropdown wiring ─────────────────── */
+function wirePrioDropdown(reportId) {
+  const trigger = document.getElementById('prio-trigger');
+  const menu    = document.getElementById('prio-menu');
+
+  // Clone to remove old listeners
+  const newTrigger = trigger.cloneNode(true);
+  trigger.parentNode.replaceChild(newTrigger, trigger);
+
+  newTrigger.addEventListener('click', e => {
+    e.stopPropagation();
+    menu.classList.toggle('hidden');
+  });
+
+  menu.querySelectorAll('.prio-opt').forEach(opt => {
+    opt.addEventListener('click', e => {
+      e.stopPropagation();
+      const newPrio = opt.dataset.prio;
+      nuiFetch('setPriority', { reportId, priority: newPrio });
+      document.getElementById('prio-label').textContent = priorityLabel(newPrio);
+      menu.classList.add('hidden');
+    });
+  });
+}
+
+// Close prio menu on outside click
+document.addEventListener('click', e => {
+  const prioSel = document.getElementById('prio-sel');
+  const menu    = document.getElementById('prio-menu');
+  if (prioSel && menu && !prioSel.contains(e.target)) {
+    menu.classList.add('hidden');
+  }
+});
 
 /* ── Message tabs ─────────────────────────────── */
 document.querySelectorAll('.msg-tab').forEach(btn =>
@@ -383,8 +484,12 @@ function renderMsgTabs(r) {
 }
 
 function renderChatList(r) {
-  const list = document.getElementById('d-chat-list');
-  const msgs = r.messages ?? [];
+  const list  = document.getElementById('d-chat-list');
+  const badge = document.getElementById('chat-count');
+  const msgs  = r.messages ?? [];
+
+  if (badge) badge.textContent = msgs.length > 0 ? msgs.length : '';
+
   if (msgs.length === 0) { list.innerHTML = '<span class="no-msgs">No messages yet</span>'; return; }
   list.innerHTML = '';
   msgs.forEach(m => {
@@ -397,8 +502,12 @@ function renderChatList(r) {
 }
 
 function renderNotesList(r) {
-  const list = document.getElementById('d-notes-list');
+  const list  = document.getElementById('d-notes-list');
+  const badge = document.getElementById('notes-count');
   const notes = r.adminNotes ?? [];
+
+  if (badge) badge.textContent = notes.length > 0 ? notes.length : '';
+
   if (notes.length === 0) { list.innerHTML = '<span class="no-msgs">No admin notes yet</span>'; return; }
   list.innerHTML = '';
   notes.forEach(n => {
@@ -438,92 +547,129 @@ function sendAdminNote() {
    STATISTICS TAB
 ════════════════════════════════════════════════════════════ */
 function renderStats() {
-  const all     = Object.values(S.allReports);
-  const total   = all.length;
-  const open    = all.filter(r=>r.status==='open').length;
-  const active  = all.filter(r=>r.status==='active').length;
-  const closed  = all.filter(r=>r.status==='closed').length;
+  const all    = Object.values(S.allReports);
+  const total  = all.length;
+  const open   = all.filter(r => r.status === 'open').length;
+  const active = all.filter(r => r.status === 'active').length;
+  const closed = all.filter(r => r.status === 'closed').length;
 
-  // Avg resolution time
-  const resolved = all.filter(r=>r.status==='closed'&&r.closedAt&&r.createdAt);
+  const resolved = all.filter(r => r.status==='closed' && r.closedAt && r.createdAt);
   const avgMins  = resolved.length
-    ? Math.round(resolved.reduce((a,r)=>a+(r.closedAt-r.createdAt),0)/resolved.length/60)
+    ? Math.round(resolved.reduce((a,r) => a + (r.closedAt - r.createdAt), 0) / resolved.length / 60)
     : 0;
-  const avgStr   = avgMins >= 60 ? `${Math.floor(avgMins/60)}h avg` : avgMins ? `${avgMins}m avg` : '';
+  const avgStr = avgMins >= 60
+    ? `${Math.floor(avgMins/60)}h avg resolution`
+    : avgMins ? `${avgMins}m avg resolution` : '';
 
-  // Metric cards
+  /* ── Stat cards ─────────── */
   document.getElementById('stat-cards').innerHTML = `
-    ${statCard('📋', '#3b82f6', 'rgba(59,130,246,.14)', total, 'Total Reports', '')}
-    ${statCard('⏳', 'var(--s-open)',   'var(--s-open-bg)',   open,   'Open',     '')}
-    ${statCard('🔒', 'var(--s-active)', 'var(--s-active-bg)', active, 'Claimed',  '')}
-    ${statCard('✅', 'var(--green)',    'var(--green-bg)',    closed, 'Resolved', avgStr)}`;
+    ${statCard('📋', '#3b82f6',        'rgba(59,130,246,.13)',  total,  'Total Reports', '')}
+    ${statCard('⏳', 'var(--s-open)',   'var(--s-open-bg)',      open,   'Open',          '')}
+    ${statCard('🔒', 'var(--s-active)', 'var(--s-active-bg)',    active, 'Claimed',       '')}
+    ${statCard('✅', 'var(--green)',    'var(--green-bg)',       closed, 'Resolved',      avgStr)}`;
 
-  // Priority chart
-  const prioCounts = { low:0, normal:0, high:0, urgent:0 };
-  all.forEach(r => { const p = r.priority??'normal'; if (prioCounts[p]!==undefined) prioCounts[p]++; });
+  /* ── Staff of the Month ─── */
+  const now        = new Date();
+  const monthStart = Math.floor(new Date(now.getFullYear(), now.getMonth(), 1).getTime() / 1000);
+  const monthEnd   = Math.floor(new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime() / 1000);
+  const monthName  = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+
+  const sotmMap = {};
+  all.filter(r => r.status==='closed' && r.closedBy && r.closedAt >= monthStart && r.closedAt <= monthEnd)
+     .forEach(r => { sotmMap[r.closedBy] = (sotmMap[r.closedBy] ?? 0) + 1; });
+  const sotmEntries = Object.entries(sotmMap).sort((a,b) => b[1] - a[1]);
+  const sotm = sotmEntries[0];
+
+  document.getElementById('sotm-wrap').innerHTML = `
+    <div class="sotm-card">
+      <div class="sotm-trophy">${sotm ? '👑' : '🏆'}</div>
+      <div>
+        <div class="sotm-label">Staff of the Month — ${monthName}</div>
+        <div class="sotm-name" style="${sotm ? '' : 'color:var(--txt-3);font-size:15px'}">
+          ${sotm ? esc(sotm[0]) : 'No resolutions recorded yet this month'}
+        </div>
+        ${sotm ? `<div class="sotm-stat">${sotm[1]} report${sotm[1] > 1 ? 's' : ''} resolved this month</div>` : ''}
+      </div>
+      <div class="sotm-badge">🏆</div>
+    </div>`;
+
+  /* ── Charts ─────────────── */
+  const grid = document.getElementById('charts-grid');
+  grid.innerHTML = '';
+
+  // Priority breakdown
+  const prioData = [
+    { id:'normal',     label:'Normal',           color:'var(--p-normal)' },
+    { id:'higher_up',  label:'Need a Higher Up', color:'var(--p-higher)' },
+    { id:'management', label:'Need Management',  color:'var(--p-mgmt)' },
+  ];
+  const prioCounts = { normal:0, higher_up:0, management:0 };
+  all.forEach(r => { const p = r.priority ?? 'normal'; if (prioCounts[p] !== undefined) prioCounts[p]++; });
   const prioMax = Math.max(...Object.values(prioCounts), 1);
-  document.getElementById('chart-priority').innerHTML = `
-    <div class="chart-title">Reports by Priority</div>
-    ${barRow('Urgent', prioCounts.urgent, prioMax, 'var(--p-urgent)')}
-    ${barRow('High',   prioCounts.high,   prioMax, 'var(--p-high)')}
-    ${barRow('Normal', prioCounts.normal, prioMax, 'var(--p-normal)')}
-    ${barRow('Low',    prioCounts.low,    prioMax, 'var(--p-low)')}`;
 
-  // Category chart
+  grid.appendChild(buildChart('Reports by Priority',
+    prioData.map(p => barRow(p.label, prioCounts[p.id], prioMax, p.color))));
+
+  // Category breakdown
   const catCounts = {};
-  all.forEach(r => { const l=r.categoryLabel??r.category; catCounts[l]=(catCounts[l]??0)+1; });
-  const catMax = Math.max(...Object.values(catCounts), 1);
+  all.forEach(r => { const l = r.categoryLabel ?? r.category; catCounts[l] = (catCounts[l] ?? 0) + 1; });
+  const catMax  = Math.max(...Object.values(catCounts), 1);
   const catRows = Object.entries(catCounts)
-    .sort((a,b)=>b[1]-a[1])
-    .map(([l,n]) => barRow(l, n, catMax, 'var(--accent)'))
-    .join('');
-  document.getElementById('chart-category').innerHTML = `
-    <div class="chart-title">Reports by Category</div>${catRows || '<p style="color:var(--txt-3);font-size:12px">No data yet</p>'}`;
+    .sort((a,b) => b[1] - a[1])
+    .map(([l,n]) => barRow(l, n, catMax, 'var(--accent)'));
 
-  // Status chart
-  document.getElementById('chart-status').innerHTML = `
-    <div class="chart-title">Reports by Status</div>
-    ${barRow('Open',     open,   total||1, 'var(--s-open)')}
-    ${barRow('Claimed',  active, total||1, 'var(--s-active)')}
-    ${barRow('Resolved', closed, total||1, 'var(--green)')}`;
+  grid.appendChild(buildChart('Reports by Category',
+    catRows.length ? catRows : ['<p class="chart-nodata">No data yet</p>']));
+
+  // Status breakdown
+  grid.appendChild(buildChart('Reports by Status', [
+    barRow('Open',     open,   total || 1, 'var(--s-open)'),
+    barRow('Claimed',  active, total || 1, 'var(--s-active)'),
+    barRow('Resolved', closed, total || 1, 'var(--green)'),
+  ]));
 
   // Leaderboard
   const lbMap = {};
-  all.filter(r=>r.status==='closed'&&r.closedBy).forEach(r => {
-    lbMap[r.closedBy] = (lbMap[r.closedBy]??0)+1;
-  });
-  const lbRows = Object.entries(lbMap)
-    .sort((a,b)=>b[1]-a[1]).slice(0,5)
-    .map(([name,count],i) => {
-      const rankClass = i===0?'gold':i===1?'silver':i===2?'bronze':'';
+  all.filter(r => r.status==='closed' && r.closedBy)
+     .forEach(r => { lbMap[r.closedBy] = (lbMap[r.closedBy] ?? 0) + 1; });
+  const lbRows = Object.entries(lbMap).sort((a,b) => b[1]-a[1]).slice(0,5)
+    .map(([name, count], i) => {
+      const rankClass = ['gold','silver','bronze'][i] ?? '';
       return `<div class="lb-row">
         <div class="lb-rank ${rankClass}">${i+1}</div>
         <div class="lb-name">${esc(name)}</div>
         <div class="lb-count">${count} resolved</div>
       </div>`;
-    }).join('');
-  document.getElementById('chart-leaderboard').innerHTML = `
-    <div class="chart-title">Admin Leaderboard</div>
-    ${lbRows || '<p style="color:var(--txt-3);font-size:12px">No resolutions yet</p>'}`;
+    });
+
+  grid.appendChild(buildChart('Admin Leaderboard',
+    lbRows.length ? lbRows : ['<p class="chart-nodata">No resolutions yet</p>']));
+}
+
+function buildChart(title, rows) {
+  const div = document.createElement('div');
+  div.className = 'chart-card';
+  div.innerHTML = `<div class="chart-title">${esc(title)}</div>${rows.join('')}`;
+  return div;
 }
 
 function statCard(icon, color, bg, num, label, hint) {
   return `<div class="stat-card">
-    <div class="stat-card-icon" style="background:${bg};color:${color}">${icon}</div>
+    <div class="stat-icon" style="background:${bg};color:${color}">${icon}</div>
     <div>
-      <div class="stat-card-num">${num}</div>
-      <div class="stat-card-lbl">${label}</div>
-      ${hint ? `<div class="stat-card-hint">${hint}</div>` : ''}
+      <div class="stat-num">${num}</div>
+      <div class="stat-lbl">${label}</div>
+      ${hint ? `<div class="stat-hint">${hint}</div>` : ''}
     </div>
   </div>`;
 }
 
 function barRow(label, count, max, color) {
-  const pct = max > 0 ? Math.round((count/max)*100) : 0;
+  const pct = max > 0 ? Math.round((count / max) * 100) : 0;
   return `<div class="bar-row">
     <div class="bar-lbl">${esc(label)}</div>
     <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
-    <div class="bar-count">${count}</div>
+    <div class="bar-val">${count}</div>
   </div>`;
 }
 
@@ -535,27 +681,26 @@ document.getElementById('open-submit-btn').addEventListener('click', openSubmitF
 
 function openSubmitForm() {
   S.selectedCat = null;
-  document.getElementById('sf-desc').value   = '';
-  document.getElementById('sf-player').value = '';
-  document.getElementById('sf-chars').textContent = '0';
-  document.getElementById('sf-submit').disabled   = true;
+  document.getElementById('sf-desc').value         = '';
+  document.getElementById('sf-player').value       = '';
+  document.getElementById('sf-chars').textContent  = '0';
+  document.getElementById('sf-submit').disabled    = true;
   document.getElementById('sf-player-field').classList.add('hidden');
   resetCselTrigger();
   document.getElementById('csel-dd').classList.add('hidden');
   document.getElementById('csel-trigger').classList.remove('open');
 
-  // Populate category options
   const dd = document.getElementById('csel-dd');
   dd.innerHTML = '';
   S.categories.forEach(cat => {
     const el = document.createElement('div');
-    el.className = 'csel-opt';
-    el.dataset.id = cat.id;
+    el.className    = 'csel-opt';
+    el.dataset.id   = cat.id;
     el.innerHTML = `
-      <div class="csel-opt-icon">${esc(cat.icon??'📋')}</div>
+      <div class="csel-opt-icon">${esc(cat.icon ?? '📋')}</div>
       <div>
         <div class="csel-opt-lbl">${esc(cat.label)}</div>
-        <div class="csel-opt-desc">${esc(cat.description??'')}</div>
+        <div class="csel-opt-desc">${esc(cat.description ?? '')}</div>
       </div>`;
     el.addEventListener('click', () => pickCat(cat));
     dd.appendChild(el);
@@ -577,13 +722,12 @@ function pickCat(cat) {
   const trigger = document.getElementById('csel-trigger');
   trigger.classList.remove('open');
   trigger.innerHTML = `
-    <div class="csel-val"><span>${esc(cat.icon??'📋')}</span><span>${esc(cat.label)}</span></div>
+    <div class="csel-val"><span>${esc(cat.icon ?? '📋')}</span><span>${esc(cat.label)}</span></div>
     <svg class="csel-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14"
          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
          stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>`;
   document.getElementById('csel-dd').classList.add('hidden');
-  document.getElementById('sf-player-field')
-    .classList.toggle('hidden', !cat.showPlayerField);
+  document.getElementById('sf-player-field').classList.toggle('hidden', !cat.showPlayerField);
   checkSfSubmit();
 }
 
@@ -609,13 +753,13 @@ document.getElementById('sf-desc').addEventListener('input', function() {
 
 function checkSfSubmit() {
   const desc = document.getElementById('sf-desc').value.trim();
-  document.getElementById('sf-submit').disabled = !S.selectedCat || desc.length < 10;
+  document.getElementById('sf-submit').disabled = !S.selectedCat || desc.length < 1;
 }
 
 document.getElementById('sf-submit').addEventListener('click', () => {
   const desc   = document.getElementById('sf-desc').value.trim();
   const target = document.getElementById('sf-player').value.trim();
-  if (!S.selectedCat || desc.length < 10) return;
+  if (!S.selectedCat || desc.length < 1) return;
 
   nuiFetch('submitReport', {
     category     : S.selectedCat.id,
@@ -698,15 +842,23 @@ document.getElementById('close-panel').addEventListener('click', () => {
 });
 
 function closeAll() {
-  document.getElementById('main-panel') .classList.add('hidden');
-  document.getElementById('submit-form').classList.add('hidden');
+  document.getElementById('main-panel')  .classList.add('hidden');
+  document.getElementById('submit-form') .classList.add('hidden');
   document.getElementById('close-prompt').classList.add('hidden');
 }
 
 
 /* ── Utils ────────────────────────────────────── */
-function capitalize(s) { return s ? s.charAt(0).toUpperCase()+s.slice(1) : ''; }
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
 
 function statusLabel(s) {
   return { open:'Open', active:'Claimed', closed:'Resolved' }[s] ?? capitalize(s);
+}
+
+function priorityLabel(p) {
+  return {
+    normal    : 'Normal',
+    higher_up : 'Need a Higher Up',
+    management: 'Need Management',
+  }[p] ?? 'Normal';
 }

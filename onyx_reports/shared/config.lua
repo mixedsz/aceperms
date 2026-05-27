@@ -3,23 +3,26 @@ Config = {}
 -- ┌──────────────────────────────────────────────────────────┐
 -- │                    FRAMEWORK                             │
 -- │  Supported: 'auto' | 'esx' | 'qbcore' | 'qbox'         │
--- │  'auto' detects the running framework automatically      │
 -- └──────────────────────────────────────────────────────────┘
 Config.Framework = 'auto'
 
 -- ┌──────────────────────────────────────────────────────────┐
+-- │                   UI / THEME                             │
+-- │  Color is a hex value — ALL accent colors derive from it │
+-- │  No purple is hardcoded anywhere else in the UI          │
+-- └──────────────────────────────────────────────────────────┘
+Config.UI = {
+    Color = '#5865f2',  -- change to any hex color you like
+}
+
+-- ┌──────────────────────────────────────────────────────────┐
 -- │                  ADMIN PERMISSIONS                       │
--- │                                                          │
 -- │  UseAcePerms = false  → groups below are used           │
 -- │  UseAcePerms = true   → ace permission node is used     │
--- │    add_principal identifier.steam:XXXXXX group.admin     │
--- │    add_ace group.admin reports.admin allow               │
 -- └──────────────────────────────────────────────────────────┘
 Config.UseAcePerms   = false
 Config.AcePermission = 'reports.admin'
 
--- Groups that can access /reports (used when UseAcePerms = false)
--- Add or remove group names to match your server setup
 Config.AdminGroups = {
     esx    = { 'admin', 'owner', 'support' },
     qbcore = { 'admin', 'owner', 'support' },
@@ -52,10 +55,10 @@ Config.Categories = {
         showPlayerField = false,
     },
     {
-        id              = 'harassment',
-        label           = 'Harassment',
-        icon            = '⚠️',
-        description     = 'Report harassment or toxic behaviour',
+        id              = 'tos',
+        label           = 'TOS Report',
+        icon            = '📜',
+        description     = 'Report a violation of the Terms of Service',
         showPlayerField = true,
     },
     {
@@ -82,21 +85,27 @@ Config.Categories = {
 }
 
 -- ┌──────────────────────────────────────────────────────────┐
+-- │               ESCALATION / PRIORITY LEVELS               │
+-- │  Admins can escalate a report to notify higher staff     │
+-- └──────────────────────────────────────────────────────────┘
+Config.Priorities = {
+    { id = 'normal',     label = 'Normal',            color = 'normal'     },
+    { id = 'higher_up',  label = 'Need a Higher Up',  color = 'higher_up'  },
+    { id = 'management', label = 'Need Management',   color = 'management' },
+}
+
+-- ┌──────────────────────────────────────────────────────────┐
 -- │                     COMMANDS                             │
 -- └──────────────────────────────────────────────────────────┘
 Config.Commands = {
-    user  = 'report',   -- /report  — opens report submission UI
-    admin = 'reports',  -- /reports — opens admin management panel
+    user  = 'report',
+    admin = 'reports',
 }
 
 -- ┌──────────────────────────────────────────────────────────┐
 -- │                  GENERAL SETTINGS                        │
 -- └──────────────────────────────────────────────────────────┘
-
--- Seconds a player must wait between report submissions
-Config.Cooldown = 120
-
--- Discord webhook URL for new-report pings (leave empty to disable)
+Config.Cooldown       = 120
 Config.DiscordWebhook = ''
 
 -- ┌──────────────────────────────────────────────────────────┐
@@ -106,7 +115,7 @@ Config.Locale = {
     report_submitted  = 'Your report has been submitted. A staff member will assist you shortly.',
     report_cooldown   = 'Please wait %ds before submitting another report.',
     not_authorized    = 'You are not authorised to use this command.',
-    desc_too_short    = 'Please provide more detail (minimum 10 characters).',
+    desc_too_short    = 'Please provide a description.',
     staff_message     = 'Staff message from %s: %s',
     report_closed_msg = 'Your report has been closed. Reason: %s',
     report_handled    = 'A staff member has picked up your report.',

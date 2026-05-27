@@ -17,7 +17,89 @@ local function ReportList()
 end
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- /report  — opens the panel for a player (My Reports tab)
+-- Character name — tries framework first, then oxmysql, then FiveM name
+-- ─────────────────────────────────────────────────────────────────────────────
+local function GetCharacterName(source, callback)
+    local src      = tonumber(source)
+    local fallback = GetPlayerName(src) or 'Unknown'
+
+    -- ESX
+    if FrameworkName == 'esx' and Framework then
+        local xPlayer = Framework.GetPlayerFromId(src)
+        if xPlayer then
+            local fn = xPlayer.get('firstName')
+            local ln = xPlayer.get('lastName')
+            if fn and fn ~= '' then
+                callback(((fn .. ' ' .. (ln or '')):gsub('^%s*(.-)%s*$', '%1')))
+                return
+            end
+        end
+    end
+
+    -- QBCore
+    if FrameworkName == 'qbcore' and Framework then
+        local player = Framework.Functions.GetPlayer(src)
+        if player and player.PlayerData.charinfo then
+            local ci   = player.PlayerData.charinfo
+            local name = ((ci.firstname or '') .. ' ' .. (ci.lastname or '')):gsub('^%s*(.-)%s*$', '%1')
+            if #name > 1 then callback(name) return end
+        end
+    end
+
+    -- Qbox
+    if FrameworkName == 'qbox' then
+        local player = exports.qbx_core:GetPlayer(src)
+        if player and player.PlayerData.charinfo then
+            local ci   = player.PlayerData.charinfo
+            local name = ((ci.firstname or '') .. ' ' .. (ci.lastname or '')):gsub('^%s*(.-)%s*$', '%1')
+            if #name > 1 then callback(name) return end
+        end
+    end
+
+    -- oxmysql fallback (optional dependency)
+    if GetResourceState('oxmysql') == 'started' then
+        local license = nil
+        for _, id in ipairs(GetPlayerIdentifiers(src)) do
+            if id:sub(1, 8) == 'license:' then license = id break end
+        end
+
+        if license then
+            exports.oxmysql:single(
+                "SELECT CONCAT(COALESCE(firstname,''), ' ', COALESCE(lastname,'')) AS charname FROM users WHERE identifier = ? LIMIT 1",
+                { license },
+                function(result)
+                    if result and result.charname and result.charname:match('%S') then
+                        callback(result.charname:gsub('^%s*(.-)%s*$', '%1'))
+                    else
+                        callback(fallback)
+                    end
+                end
+            )
+            return
+        end
+    end
+
+    callback(fallback)
+end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Notify all online admins — fires a beautiful NUI toast (no focus taken)
+-- ─────────────────────────────────────────────────────────────────────────────
+local function NotifyAdminsNUI(reportId, playerName, category)
+    for _, src in ipairs(GetPlayers()) do
+        local pid = tonumber(src)
+        if IsAdmin(pid) then
+            TriggerClientEvent('onyx_reports:adminNotification', pid, {
+                reportId   = reportId,
+                playerName = playerName,
+                category   = category,
+            })
+        end
+    end
+end
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- /report  — open panel (My Reports tab)
 -- ─────────────────────────────────────────────────────────────────────────────
 RegisterCommand(Config.Commands.user, function(source)
     local src = tonumber(source)
@@ -29,7 +111,6 @@ RegisterCommand(Config.Commands.user, function(source)
         return
     end
 
-    -- Collect this player's own reports
     local mine = {}
     for _, r in pairs(Reports) do
         if r.source == src then mine[#mine + 1] = r end
@@ -39,13 +120,15 @@ RegisterCommand(Config.Commands.user, function(source)
         isAdmin    = IsAdmin(src),
         defaultTab = 'my-reports',
         categories = Config.Categories,
+        priorities = Config.Priorities,
+        uiColor    = Config.UI.Color,
         myReports  = mine,
         reports    = IsAdmin(src) and ReportList() or nil,
     })
 end, false)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- /reports — opens the panel for admins (Admin Panel tab)
+-- /reports — open panel (Admin Panel tab)
 -- ─────────────────────────────────────────────────────────────────────────────
 RegisterCommand(Config.Commands.admin, function(source)
     local src = tonumber(source)
@@ -59,6 +142,8 @@ RegisterCommand(Config.Commands.admin, function(source)
         isAdmin    = true,
         defaultTab = 'admin',
         categories = Config.Categories,
+        priorities = Config.Priorities,
+        uiColor    = Config.UI.Color,
         reports    = ReportList(),
     })
 end, false)
@@ -70,46 +155,49 @@ RegisterNetEvent('onyx_reports:createReport', function(data)
     local src = tonumber(source)
 
     if not data or not data.category or not data.description then return end
-
-    if #data.description < 10 then
+    if #(data.description or '') < 1 then
         NotifyPlayer(src, Config.Locale.desc_too_short, 'error')
         return
     end
 
     Cooldowns[src] = os.time()
+    local id = NewID()
 
-    local id     = NewID()
-    local name   = GetDisplayName(src)
-    local report = {
-        id            = id,
-        source        = src,
-        playerName    = name,
-        category      = data.category,
-        categoryLabel = data.categoryLabel or data.category,
-        description   = data.description,
-        targetName    = data.targetName or nil,
-        priority      = 'normal',
-        status        = 'open',
-        handledBy     = nil,
-        closedBy      = nil,
-        closeReason   = nil,
-        closedAt      = nil,
-        playerOnline  = true,
-        createdAt     = os.time(),
-        messages      = {},
-        adminNotes    = {},
-    }
+    GetCharacterName(src, function(charName)
+        local report = {
+            id            = id,
+            source        = src,
+            playerName    = charName,
+            category      = data.category,
+            categoryLabel = data.categoryLabel or data.category,
+            description   = data.description,
+            targetName    = data.targetName or nil,
+            priority      = 'normal',
+            status        = 'open',
+            handledBy     = nil,
+            closedBy      = nil,
+            closeReason   = nil,
+            closedAt      = nil,
+            playerOnline  = true,
+            createdAt     = os.time(),
+            messages      = {},
+            adminNotes    = {},
+        }
 
-    Reports[id] = report
+        Reports[id] = report
 
-    NotifyPlayer(src, Config.Locale.report_submitted, 'success')
-    NotifyAdmins(('New %s report [%s] from %s'):format(report.categoryLabel, id, name), 'inform')
+        NotifyPlayer(src, Config.Locale.report_submitted, 'success')
 
-    TriggerClientEvent('onyx_reports:reportCreated', -1, report)
+        -- NUI toast on all admin screens (no focus)
+        NotifyAdminsNUI(id, charName, report.categoryLabel)
 
-    if Config.DiscordWebhook ~= '' then
-        SendToDiscord(report)
-    end
+        -- Real-time list update
+        TriggerClientEvent('onyx_reports:reportCreated', -1, report)
+
+        if Config.DiscordWebhook ~= '' then
+            SendToDiscord(report)
+        end
+    end)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -122,15 +210,17 @@ RegisterNetEvent('onyx_reports:handleReport', function(reportId)
     local report = Reports[reportId]
     if not report or report.status ~= 'open' then return end
 
-    report.status       = 'active'
-    report.handledBy    = GetDisplayName(src)
-    report.handledBySrc = src
+    GetCharacterName(src, function(adminName)
+        report.status       = 'active'
+        report.handledBy    = adminName
+        report.handledBySrc = src
 
-    TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
+        TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
 
-    if report.source and NetworkIsPlayerActive(report.source) then
-        NotifyPlayer(report.source, Config.Locale.report_handled, 'inform')
-    end
+        if report.source and NetworkIsPlayerActive(report.source) then
+            NotifyPlayer(report.source, Config.Locale.report_handled, 'inform')
+        end
+    end)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -143,20 +233,22 @@ RegisterNetEvent('onyx_reports:closeReport', function(reportId, reason)
     local report = Reports[reportId]
     if not report or report.status == 'closed' then return end
 
-    report.status      = 'closed'
-    report.closedBy    = GetDisplayName(src)
-    report.closeReason = reason or 'No reason provided'
-    report.closedAt    = os.time()
+    GetCharacterName(src, function(adminName)
+        report.status      = 'closed'
+        report.closedBy    = adminName
+        report.closeReason = reason or 'No reason provided'
+        report.closedAt    = os.time()
 
-    TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
+        TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
 
-    if report.source and NetworkIsPlayerActive(report.source) then
-        NotifyPlayer(report.source, Config.Locale.report_closed_msg:format(report.closeReason), 'inform')
-    end
+        if report.source and NetworkIsPlayerActive(report.source) then
+            NotifyPlayer(report.source, Config.Locale.report_closed_msg:format(report.closeReason), 'inform')
+        end
+    end)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Admin → Player chat message
+-- Send message to reporter
 -- ─────────────────────────────────────────────────────────────────────────────
 RegisterNetEvent('onyx_reports:sendMessage', function(reportId, message)
     local src    = tonumber(source)
@@ -166,50 +258,51 @@ RegisterNetEvent('onyx_reports:sendMessage', function(reportId, message)
     if not report or report.status == 'closed' then return end
     if not message or #message < 1 then return end
 
-    local msgData = {
-        sender     = GetDisplayName(src),
-        senderType = 'admin',
-        message    = message,
-        timestamp  = os.time(),
-    }
+    GetCharacterName(src, function(adminName)
+        local msgData = {
+            sender     = adminName,
+            senderType = 'admin',
+            message    = message,
+            timestamp  = os.time(),
+        }
 
-    table.insert(report.messages, msgData)
-    TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
+        table.insert(report.messages, msgData)
+        TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
 
-    if report.source and NetworkIsPlayerActive(report.source) then
-        TriggerClientEvent('onyx_reports:receiveMessage', report.source, reportId, msgData)
-    end
+        if report.source and NetworkIsPlayerActive(report.source) then
+            TriggerClientEvent('onyx_reports:receiveMessage', report.source, reportId, msgData)
+        end
+    end)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Admin Note (internal only, never shown to reporter)
+-- Admin Note (internal only)
 -- ─────────────────────────────────────────────────────────────────────────────
 RegisterNetEvent('onyx_reports:addAdminNote', function(reportId, note)
     local src    = tonumber(source)
     if not IsAdmin(src) then return end
 
     local report = Reports[reportId]
-    if not report then return end
-    if not note or #note < 1 then return end
+    if not report or not note or #note < 1 then return end
 
-    local noteData = {
-        sender    = GetDisplayName(src),
-        message   = note,
-        timestamp = os.time(),
-    }
-
-    table.insert(report.adminNotes, noteData)
-    TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
+    GetCharacterName(src, function(adminName)
+        table.insert(report.adminNotes, {
+            sender    = adminName,
+            message   = note,
+            timestamp = os.time(),
+        })
+        TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
+    end)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Set priority
+-- Set priority / escalation level
 -- ─────────────────────────────────────────────────────────────────────────────
 RegisterNetEvent('onyx_reports:setPriority', function(reportId, priority)
     local src    = tonumber(source)
     if not IsAdmin(src) then return end
 
-    local valid = { low = true, normal = true, high = true, urgent = true }
+    local valid = { normal = true, higher_up = true, management = true }
     if not valid[priority] then return end
 
     local report = Reports[reportId]
@@ -220,7 +313,7 @@ RegisterNetEvent('onyx_reports:setPriority', function(reportId, priority)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Player disconnect — mark reports as offline
+-- Player disconnect
 -- ─────────────────────────────────────────────────────────────────────────────
 AddEventHandler('playerDropped', function()
     local src = tonumber(source)
@@ -238,11 +331,11 @@ function SendToDiscord(report)
             embeds = {{
                 title       = ('[%s] %s — %s'):format(report.id, report.categoryLabel, report.playerName),
                 description = report.description,
-                color       = 9109504,
+                color       = 5793266,
                 fields      = {
-                    { name = 'Category',  value = report.categoryLabel,     inline = true },
-                    { name = 'Reporter',  value = report.playerName,        inline = true },
-                    { name = 'Server ID', value = tostring(report.source),  inline = true },
+                    { name = 'Category',  value = report.categoryLabel,    inline = true },
+                    { name = 'Reporter',  value = report.playerName,       inline = true },
+                    { name = 'Server ID', value = tostring(report.source), inline = true },
                 },
                 footer    = { text = 'Onyx Reports' },
                 timestamp = os.date('!%Y-%m-%dT%H:%M:%SZ'),

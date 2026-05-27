@@ -1,7 +1,15 @@
 local UIOpen = false
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Server → Client : open the main panel
+-- Apply theme color as soon as resource starts (notifications need it too)
+-- ─────────────────────────────────────────────────────────────────────────────
+AddEventHandler('onClientResourceStart', function(res)
+    if res ~= GetCurrentResourceName() then return end
+    SendNUIMessage({ action = 'setThemeColor', color = Config.UI.Color })
+end)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Open main panel
 -- ─────────────────────────────────────────────────────────────────────────────
 RegisterNetEvent('onyx_reports:openPanel', function(data)
     UIOpen = true
@@ -11,13 +19,15 @@ RegisterNetEvent('onyx_reports:openPanel', function(data)
         isAdmin    = data.isAdmin,
         defaultTab = data.defaultTab,
         categories = data.categories,
+        priorities = data.priorities,
+        uiColor    = data.uiColor,
         reports    = data.reports,
         myReports  = data.myReports,
     })
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Real-time pushes from server
+-- Real-time report updates
 -- ─────────────────────────────────────────────────────────────────────────────
 RegisterNetEvent('onyx_reports:reportCreated', function(report)
     if not UIOpen then return end
@@ -38,6 +48,13 @@ end)
 
 RegisterNetEvent('onyx_reports:notify', function(msg, nType)
     Notify(msg, nType)
+end)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Admin notification toast — no NUI focus, appears over game world
+-- ─────────────────────────────────────────────────────────────────────────────
+RegisterNetEvent('onyx_reports:adminNotification', function(data)
+    SendNUIMessage({ action = 'adminNotification', data = data })
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -80,7 +97,7 @@ RegisterNUICallback('setPriority', function(data, cb)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- ESC to close
+-- ESC to close panel
 -- ─────────────────────────────────────────────────────────────────────────────
 CreateThread(function()
     while true do

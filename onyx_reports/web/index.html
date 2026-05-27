@@ -9,11 +9,16 @@
 <body>
 
   <!-- ═══════════════════════════════════════════════
-       MAIN PANEL  (large floating window, no overlay)
+       ADMIN NOTIFICATION TOASTS  (no NUI focus needed)
+  ════════════════════════════════════════════════ -->
+  <div id="notif-area" class="notif-area"></div>
+
+
+  <!-- ═══════════════════════════════════════════════
+       MAIN PANEL
   ════════════════════════════════════════════════ -->
   <div id="main-panel" class="panel hidden">
 
-    <!-- Header -->
     <header class="panel-hdr">
       <div class="brand">
         <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24"
@@ -29,7 +34,7 @@
 
       <nav class="panel-nav" id="panel-nav">
         <button class="nav-tab" data-tab="my-reports">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
                fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
             <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
@@ -38,7 +43,7 @@
           My Reports
         </button>
         <button class="nav-tab admin-only hidden" data-tab="admin">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
                fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
@@ -46,7 +51,7 @@
           Admin Panel
         </button>
         <button class="nav-tab admin-only hidden" data-tab="stats">
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
                fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="20" x2="18" y2="10"/>
@@ -58,8 +63,8 @@
       </nav>
 
       <div class="hdr-right">
-        <button class="hdr-btn" id="close-panel" title="Close">
-          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+        <button class="hdr-btn" id="close-panel">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
                fill="none" stroke="currentColor" stroke-width="2.5"
                stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -68,12 +73,12 @@
       </div>
     </header>
 
-    <!-- ── TAB: My Reports ───────────────────────── -->
+    <!-- ── My Reports tab ──────────────────────────── -->
     <div class="tab-view hidden" id="view-my-reports">
       <aside class="sidebar">
         <div class="sidebar-top">
           <button class="create-btn" id="open-submit-btn">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
                  fill="none" stroke="currentColor" stroke-width="2.5"
                  stroke-linecap="round" stroke-linejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -86,34 +91,23 @@
             <span>Show resolved</span>
           </label>
         </div>
-        <div class="r-list" id="my-report-list">
-          <div class="list-empty">
-            <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24"
-                 fill="none" stroke="currentColor" stroke-width="1.4"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            <p>No reports yet</p>
-          </div>
-        </div>
+        <div class="r-list" id="my-report-list"></div>
       </aside>
-      <section class="detail-pane" id="my-detail-pane">
-        <div class="detail-empty-state">
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24"
+      <section class="detail-pane">
+        <div class="detail-empty-state" id="my-empty">
+          <svg xmlns="http://www.w3.org/2000/svg" width="46" height="46" viewBox="0 0 24 24"
                fill="none" stroke="currentColor" stroke-width="1.2"
                stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
           <h3>No report selected</h3>
-          <p>Select a report from the list or create a new one</p>
+          <p>Select a report or create a new one</p>
         </div>
-        <div class="detail-content hidden" id="my-detail-content">
-          <!-- populated by JS -->
-        </div>
+        <div class="detail-content hidden" id="my-detail-content"></div>
       </section>
     </div>
 
-    <!-- ── TAB: Admin Panel ──────────────────────── -->
+    <!-- ── Admin Panel tab ────────────────────────── -->
     <div class="tab-view hidden" id="view-admin">
       <aside class="sidebar">
         <div class="sidebar-filters">
@@ -128,52 +122,62 @@
           </select>
         </div>
         <div class="sidebar-search">
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
                fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
             <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <input class="search-inp" id="search-inp" type="text" placeholder="Search by player…" />
+          <input class="search-inp" id="search-inp" type="text" placeholder="Search by player name…" />
         </div>
-        <div class="r-list" id="admin-report-list">
-          <div class="list-empty">
-            <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 24 24"
-                 fill="none" stroke="currentColor" stroke-width="1.4"
-                 stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            <p>No reports found</p>
-          </div>
-        </div>
+        <div class="r-list" id="admin-report-list"></div>
       </aside>
 
-      <section class="detail-pane" id="admin-detail-pane">
+      <section class="detail-pane">
         <div class="detail-empty-state" id="admin-empty">
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24"
+          <svg xmlns="http://www.w3.org/2000/svg" width="46" height="46" viewBox="0 0 24 24"
                fill="none" stroke="currentColor" stroke-width="1.2"
                stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
           <h3>No report selected</h3>
-          <p>Click a report from the list to view its details</p>
+          <p>Click a report from the list to view details</p>
         </div>
 
         <div class="detail-content hidden" id="admin-detail-content">
-          <!-- Detail header -->
           <div class="detail-hdr">
-            <div class="detail-hdr-badges" id="d-badges"></div>
+            <div class="detail-hdr-top">
+              <div class="detail-hdr-badges" id="d-badges"></div>
+              <!-- Priority selector (admin-only) -->
+              <div class="prio-sel" id="prio-sel">
+                <button class="prio-trigger" id="prio-trigger">
+                  <span id="prio-label">Normal</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24"
+                       fill="none" stroke="currentColor" stroke-width="2.5"
+                       stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </button>
+                <div class="prio-menu hidden" id="prio-menu">
+                  <div class="prio-opt" data-prio="normal">Normal</div>
+                  <div class="prio-opt" data-prio="higher_up">Need a Higher Up</div>
+                  <div class="prio-opt" data-prio="management">Need Management</div>
+                </div>
+              </div>
+            </div>
             <h2 class="detail-title" id="d-title"></h2>
             <div class="detail-meta-row" id="d-meta-row"></div>
           </div>
 
-          <!-- Description -->
-          <div class="detail-body" id="admin-detail-body">
+          <div class="detail-body">
             <div class="detail-desc-box" id="d-desc"></div>
 
-            <!-- Chat / Admin Notes tabs -->
             <div class="msg-tabs">
-              <button class="msg-tab active" data-msgtab="chat">Chat</button>
-              <button class="msg-tab" data-msgtab="notes">Admin Notes</button>
+              <button class="msg-tab active" data-msgtab="chat">
+                Chat <span class="tab-count" id="chat-count"></span>
+              </button>
+              <button class="msg-tab" data-msgtab="notes">
+                Admin Notes <span class="tab-count" id="notes-count"></span>
+              </button>
             </div>
 
             <div class="msg-view" id="msg-view-chat">
@@ -182,9 +186,9 @@
               </div>
               <div class="msg-composer">
                 <input class="msg-inp" id="admin-msg-inp" type="text"
-                       placeholder="Type a message to the reporter…" maxlength="200" />
+                       placeholder="Message the reporter…" maxlength="200" />
                 <button class="send-btn" id="send-msg-btn">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
                        fill="none" stroke="currentColor" stroke-width="2.5"
                        stroke-linecap="round" stroke-linejoin="round">
                     <line x1="22" y1="2" x2="11" y2="13"/>
@@ -200,9 +204,9 @@
               </div>
               <div class="msg-composer">
                 <input class="msg-inp" id="note-inp" type="text"
-                       placeholder="Add a note… (internal only)" maxlength="300" />
+                       placeholder="Add a note… (internal only, never shown to reporter)" maxlength="300" />
                 <button class="send-btn" id="send-note-btn">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
                        fill="none" stroke="currentColor" stroke-width="2.5"
                        stroke-linecap="round" stroke-linejoin="round">
                     <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
@@ -212,10 +216,9 @@
             </div>
           </div>
 
-          <!-- Action bar -->
           <div class="action-bar" id="action-bar">
             <button class="act-btn act-claim"   id="btn-claim">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
                    fill="none" stroke="currentColor" stroke-width="2"
                    stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
@@ -224,15 +227,15 @@
               Claim
             </button>
             <button class="act-btn act-resolve" id="btn-resolve">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
                    fill="none" stroke="currentColor" stroke-width="2"
                    stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
               Resolve
             </button>
-            <button class="act-btn act-delete"  id="btn-delete">
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
+            <button class="act-btn act-delete" id="btn-delete">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
                    fill="none" stroke="currentColor" stroke-width="2"
                    stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/>
@@ -245,20 +248,12 @@
       </section>
     </div>
 
-    <!-- ── TAB: Statistics ───────────────────────── -->
+    <!-- ── Statistics tab ────────────────────────── -->
     <div class="tab-view hidden" id="view-stats">
       <div class="stats-wrap">
-        <!-- Metric cards -->
         <div class="stat-cards" id="stat-cards"></div>
-        <!-- Charts row -->
-        <div class="charts-row">
-          <div class="chart-card" id="chart-status"></div>
-          <div class="chart-card" id="chart-category"></div>
-        </div>
-        <div class="charts-row">
-          <div class="chart-card" id="chart-priority"></div>
-          <div class="chart-card" id="chart-leaderboard"></div>
-        </div>
+        <div id="sotm-wrap"></div>
+        <div class="charts-grid" id="charts-grid"></div>
       </div>
     </div>
 
@@ -266,14 +261,13 @@
 
 
   <!-- ═══════════════════════════════════════════════
-       SUBMIT FORM  (small floating card, no overlay)
+       SUBMIT FORM  (floats over game world, no overlay)
   ════════════════════════════════════════════════ -->
-  <div id="submit-form" class="submit-form hidden">
-
+  <div id="submit-form" class="float-card hidden">
     <div class="sf-hdr">
       <div class="sf-hdr-left">
         <div class="sf-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
                fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
@@ -286,7 +280,7 @@
         </div>
       </div>
       <button class="hdr-btn" id="close-submit">
-        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
              fill="none" stroke="currentColor" stroke-width="2.5"
              stroke-linecap="round" stroke-linejoin="round">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -300,7 +294,7 @@
         <div class="csel" id="csel">
           <div class="csel-trigger" id="csel-trigger">
             <span class="csel-ph" id="csel-ph">Choose a category…</span>
-            <svg class="csel-arrow" xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+            <svg class="csel-arrow" xmlns="http://www.w3.org/2000/svg" width="13" height="13"
                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
                  stroke-linecap="round" stroke-linejoin="round">
               <polyline points="6 9 12 15 18 9"/>
@@ -319,7 +313,7 @@
       <div class="field">
         <label class="field-lbl">Description <span class="req">*</span></label>
         <textarea class="field-ta" id="sf-desc"
-                  placeholder="Describe the issue in detail. The more context you provide, the faster we can help…"
+                  placeholder="Describe the issue in detail…"
                   maxlength="500"></textarea>
         <div class="char-row"><span id="sf-chars">0</span> / 500</div>
       </div>
@@ -328,7 +322,7 @@
     <div class="sf-footer">
       <button class="btn btn-ghost" id="sf-cancel">Cancel</button>
       <button class="btn btn-primary" id="sf-submit" disabled>
-        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24"
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
              fill="none" stroke="currentColor" stroke-width="2.5"
              stroke-linecap="round" stroke-linejoin="round">
           <line x1="22" y1="2" x2="11" y2="13"/>
@@ -341,13 +335,13 @@
 
 
   <!-- ═══════════════════════════════════════════════
-       CLOSE REASON PROMPT  (small floating card)
+       CLOSE REASON PROMPT
   ════════════════════════════════════════════════ -->
-  <div id="close-prompt" class="submit-form hidden" style="max-width:400px;">
+  <div id="close-prompt" class="float-card hidden" style="max-width:400px;">
     <div class="sf-hdr">
       <div class="sf-hdr-left">
         <div class="sf-icon sf-icon--red">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24"
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
                fill="none" stroke="currentColor" stroke-width="2"
                stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="10"/>
@@ -356,11 +350,11 @@
         </div>
         <div>
           <div class="sf-title">Resolve Report</div>
-          <div class="sf-sub">Provide a closing reason for the reporter</div>
+          <div class="sf-sub">Closing reason will be sent to the reporter</div>
         </div>
       </div>
       <button class="hdr-btn" id="close-prompt-x">
-        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24"
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
              fill="none" stroke="currentColor" stroke-width="2.5"
              stroke-linecap="round" stroke-linejoin="round">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -370,8 +364,9 @@
     <div class="sf-body">
       <div class="field">
         <label class="field-lbl">Closing Reason</label>
-        <textarea class="field-ta" style="height:74px;" id="close-reason-inp"
-                  placeholder="e.g. Resolved in-game, Not enough info…" maxlength="200"></textarea>
+        <textarea class="field-ta" style="height:72px;" id="close-reason-inp"
+                  placeholder="e.g. Resolved in-game, Duplicate, Not enough info…"
+                  maxlength="200"></textarea>
       </div>
     </div>
     <div class="sf-footer">
