@@ -268,7 +268,7 @@ function switchTab(tab) {
 ════════════════════════════════════════════════════════════ */
 function renderMyList() {
   const list = document.getElementById('my-report-list');
-  let reports = Object.values(S.myReports);
+  let reports = Object.values(S.myReports).filter(r => !r.deleted);
 
   if (!S.showResolved) reports = reports.filter(r => r.status !== 'closed');
   reports.sort((a,b) => b.createdAt - a.createdAt);
@@ -308,6 +308,9 @@ function selectMyReport(id) {
   if (content) {
     content.classList.remove('hidden');
     content.innerHTML = buildPlayerDetail(r);
+    wirePlayerReply(r.id);
+    const chatList = document.getElementById('my-chat-list');
+    if (chatList) chatList.scrollTop = chatList.scrollHeight;
   }
 }
 
@@ -316,33 +319,56 @@ function buildPlayerDetail(r) {
     <div class="msg-bubble ${m.senderType}">
       <div class="bubble-meta">${esc(m.sender)}<span class="bubble-time">${fmtTime(m.timestamp)}</span></div>
       ${esc(m.message)}
-    </div>`).join('') || '<span class="no-msgs">No messages yet</span>';
+    </div>`).join('') || '<span class="no-msgs">No messages yet — a staff member will reply shortly</span>';
+
+  const canReply = r.status !== 'closed';
 
   return `
     <div class="detail-hdr">
       <div class="detail-hdr-top">
         <div class="detail-hdr-badges">
           <span class="pill pill-${r.status}">${statusLabel(r.status)}</span>
-          <span class="pill pill-${r.priority ?? 'normal'}">${priorityLabel(r.priority ?? 'normal')}</span>
+          ${r.status !== 'closed' ? `<span class="pill pill-${r.priority ?? 'normal'}">${priorityLabel(r.priority ?? 'normal')}</span>` : ''}
           <span class="pill pill-cat">${esc(r.categoryLabel ?? r.category)}</span>
         </div>
       </div>
       <h2 class="detail-title">${esc(r.categoryLabel ?? r.category)} — ${esc(r.id)}</h2>
       <div class="detail-meta-row">
         <div class="meta-item">Submitted ${timeAgo(r.createdAt)}</div>
-        ${r.handledBy ? `<div class="meta-item"><span class="meta-handler">🛡 Handled by ${esc(r.handledBy)}</span></div>` : ''}
+        ${r.handledBy ? `<div class="meta-item"><span class="meta-handler">${icon('shield',11)} Handled by ${esc(r.handledBy)}</span></div>` : ''}
         ${r.closeReason ? `<div class="meta-item">Closed: ${esc(r.closeReason)}</div>` : ''}
       </div>
     </div>
     <div class="detail-body">
       <div class="detail-desc-box">${esc(r.description)}</div>
       <div class="msg-tabs">
-        <button class="msg-tab active">Messages from Staff</button>
+        <button class="msg-tab active">Chat with Staff</button>
       </div>
       <div class="msg-view">
-        <div class="msg-list">${msgs}</div>
+        <div class="msg-list" id="my-chat-list">${msgs}</div>
+        ${canReply ? `
+        <div class="msg-composer">
+          <input class="msg-inp" id="my-reply-inp" type="text"
+                 placeholder="Reply to staff…" maxlength="200" />
+          <button class="send-btn" id="my-reply-send">${icon('check',13)}</button>
+        </div>` : ''}
       </div>
     </div>`;
+}
+
+function wirePlayerReply(reportId) {
+  const inp = document.getElementById('my-reply-inp');
+  const btn = document.getElementById('my-reply-send');
+  if (!inp || !btn) return;
+
+  const send = () => {
+    const msg = inp.value.trim();
+    if (!msg) return;
+    nuiFetch('replyMessage', { reportId, message: msg });
+    inp.value = '';
+  };
+  btn.addEventListener('click', send);
+  inp.addEventListener('keydown', e => { if (e.key === 'Enter') send(); });
 }
 
 
@@ -351,7 +377,7 @@ function buildPlayerDetail(r) {
 ════════════════════════════════════════════════════════════ */
 function renderAdminList() {
   const list = document.getElementById('admin-report-list');
-  let reports = Object.values(S.allReports);
+  let reports = Object.values(S.allReports).filter(r => !r.deleted);
 
   if (S.activeFilter !== 'all')    reports = reports.filter(r => r.status   === S.activeFilter);
   if (S.activeCatFilter !== 'all') reports = reports.filter(r => r.category === S.activeCatFilter);
@@ -928,8 +954,10 @@ function onReportCreated(r) {
 }
 
 function onReportDeleted(id) {
-  delete S.allReports[id];
-  delete S.myReports[id];
+  // Mark as deleted but KEEP in S.allReports so statistics still count it
+  if (S.allReports[id]) S.allReports[id].deleted = true;
+  if (S.myReports[id])  S.myReports[id].deleted  = true;
+
   if (S.selectedAdmin === id) {
     S.selectedAdmin = null;
     document.getElementById('admin-empty')         .classList.remove('hidden');
@@ -963,8 +991,20 @@ function onReceiveMsg(reportId, msgData) {
   if (!r) return;
   r.messages = r.messages ?? [];
   r.messages.push(msgData);
-  if (S.selectedAdmin === reportId && S.activeTab === 'admin') renderChatList(r);
-  if (S.selectedMy    === reportId && S.activeTab === 'my-reports') selectMyReport(reportId);
+  if (S.selectedAdmin === reportId && S.activeTab === 'admin') {
+    renderChatList(r);
+  }
+  if (S.selectedMy === reportId && S.activeTab === 'my-reports') {
+    // Append to existing chat list without full re-render (preserves composer focus)
+    const list = document.getElementById('my-chat-list');
+    if (list) {
+      const b = document.createElement('div');
+      b.className = `msg-bubble ${msgData.senderType}`;
+      b.innerHTML = `<div class="bubble-meta">${esc(msgData.sender)}<span class="bubble-time">${fmtTime(msgData.timestamp)}</span></div>${esc(msgData.message)}`;
+      list.appendChild(b);
+      list.scrollTop = list.scrollHeight;
+    }
+  }
 }
 
 

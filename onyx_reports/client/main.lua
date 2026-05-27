@@ -115,6 +115,11 @@ RegisterNUICallback('deleteReport', function(data, cb)
     cb({ ok = true })
 end)
 
+RegisterNUICallback('replyMessage', function(data, cb)
+    TriggerServerEvent('onyx_reports:replyMessage', data.reportId, data.message)
+    cb({ ok = true })
+end)
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- ESC to close panel
 -- ─────────────────────────────────────────────────────────────────────────────

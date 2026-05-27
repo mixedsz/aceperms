@@ -1037,8 +1037,8 @@ body {
 .csel-opt.sel         { background: var(--accent-bg); }
 .csel-opt-icon { width: 34px; height: 34px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,.75); flex-shrink: 0; }
 .csel-opt:hover .csel-opt-icon { background: var(--accent-bg); border-color: var(--accent-bd); color: var(--accent); }
-.csel-opt-lbl  { font-size: 13px; font-weight: 500; color: var(--txt-1); }
-.csel-opt-desc { font-size: 11px; color: var(--txt-3); margin-top: 1px; }
+.csel-opt-lbl  { font-size: 13px; font-weight: 600; color: #ffffff; }
+.csel-opt-desc { font-size: 11px; color: rgba(255,255,255,0.5); margin-top: 2px; }
 
 
 /* ════════════════════════════════════════════════════════════

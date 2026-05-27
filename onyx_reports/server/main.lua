@@ -294,7 +294,7 @@ RegisterNetEvent('onyx_reports:closeReport', function(reportId, reason)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Send message to reporter
+-- Admin sends message to reporter
 -- ─────────────────────────────────────────────────────────────────────────────
 RegisterNetEvent('onyx_reports:sendMessage', function(reportId, message)
     local src    = tonumber(source)
@@ -315,8 +315,38 @@ RegisterNetEvent('onyx_reports:sendMessage', function(reportId, message)
         table.insert(report.messages, msgData)
         TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
 
-        if report.source and IsPlayerConnected(report.source) then
+        -- Only notify the reporter if they are a DIFFERENT player than the admin
+        -- (prevents duplication when an admin is viewing their own report)
+        if report.source and report.source ~= src and IsPlayerConnected(report.source) then
             TriggerClientEvent('onyx_reports:receiveMessage', report.source, reportId, msgData)
+        end
+    end)
+end)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Reporter replies to admin in chat
+-- ─────────────────────────────────────────────────────────────────────────────
+RegisterNetEvent('onyx_reports:replyMessage', function(reportId, message)
+    local src    = tonumber(source)
+    local report = Reports[reportId]
+    if not report or report.status == 'closed' then return end
+    if report.source ~= src then return end  -- only the original reporter
+    if not message or #message < 1 then return end
+
+    GetCharacterName(src, function(charName)
+        local msgData = {
+            sender     = charName,
+            senderType = 'player',
+            message    = message,
+            timestamp  = os.time(),
+        }
+
+        table.insert(report.messages, msgData)
+        TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
+
+        -- Notify the handling admin if online and different from the reporter
+        if report.handledBySrc and report.handledBySrc ~= src and IsPlayerConnected(report.handledBySrc) then
+            TriggerClientEvent('onyx_reports:receiveMessage', report.handledBySrc, reportId, msgData)
         end
     end)
 end)
@@ -359,14 +389,15 @@ RegisterNetEvent('onyx_reports:setPriority', function(reportId, priority)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────
--- Delete report — removes from memory, fires reportDeleted to all clients
+-- Delete report — marks as deleted (kept for statistics), hides from lists
 -- ─────────────────────────────────────────────────────────────────────────────
 RegisterNetEvent('onyx_reports:deleteReport', function(reportId)
     local src = tonumber(source)
     if not IsAdmin(src) then return end
 
-    if not Reports[reportId] then return end
-    Reports[reportId] = nil
+    local report = Reports[reportId]
+    if not report then return end
+    report.deleted = true  -- kept in memory for stats, filtered out of UI lists
     TriggerClientEvent('onyx_reports:reportDeleted', -1, reportId)
 end)
 
