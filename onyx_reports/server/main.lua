@@ -27,15 +27,36 @@ local function GetCharacterName(source, callback)
     local src      = tonumber(source)
     local fallback = GetPlayerName(src) or 'Unknown'
 
-    -- ESX
+    local function trimmed(s)
+        return s and s:gsub('^%s*(.-)%s*$', '%1') or ''
+    end
+
+    -- ESX — try multiple approaches in order
     if FrameworkName == 'esx' and Framework then
         local xPlayer = Framework.GetPlayerFromId(src)
         if xPlayer then
-            local fn = xPlayer.get('firstName')
-            local ln = xPlayer.get('lastName')
-            if fn and fn ~= '' then
-                callback(((fn .. ' ' .. (ln or '')):gsub('^%s*(.-)%s*$', '%1')))
-                return
+            -- Try getName() (available in some ESX builds)
+            if xPlayer.getName then
+                local n = xPlayer.getName()
+                if n and trimmed(n) ~= '' then callback(trimmed(n)) return end
+            end
+            -- Try get('firstName') / get('lastName')
+            if xPlayer.get then
+                local fn = xPlayer.get('firstName')
+                local ln = xPlayer.get('lastName') or ''
+                if fn and fn ~= '' then
+                    callback(trimmed(fn .. ' ' .. ln))
+                    return
+                end
+            end
+            -- Try variables table directly
+            if xPlayer.variables then
+                local fn = xPlayer.variables.firstName
+                local ln = xPlayer.variables.lastName or ''
+                if fn and fn ~= '' then
+                    callback(trimmed(fn .. ' ' .. ln))
+                    return
+                end
             end
         end
     end
@@ -45,22 +66,22 @@ local function GetCharacterName(source, callback)
         local player = Framework.Functions.GetPlayer(src)
         if player and player.PlayerData.charinfo then
             local ci   = player.PlayerData.charinfo
-            local name = ((ci.firstname or '') .. ' ' .. (ci.lastname or '')):gsub('^%s*(.-)%s*$', '%1')
+            local name = trimmed((ci.firstname or '') .. ' ' .. (ci.lastname or ''))
             if #name > 1 then callback(name) return end
         end
     end
 
     -- Qbox
     if FrameworkName == 'qbox' then
-        local player = exports.qbx_core:GetPlayer(src)
-        if player and player.PlayerData.charinfo then
+        local ok, player = pcall(function() return exports.qbx_core:GetPlayer(src) end)
+        if ok and player and player.PlayerData.charinfo then
             local ci   = player.PlayerData.charinfo
-            local name = ((ci.firstname or '') .. ' ' .. (ci.lastname or '')):gsub('^%s*(.-)%s*$', '%1')
+            local name = trimmed((ci.firstname or '') .. ' ' .. (ci.lastname or ''))
             if #name > 1 then callback(name) return end
         end
     end
 
-    -- oxmysql fallback (optional dependency)
+    -- oxmysql fallback (optional — works when no framework returns a name)
     if GetResourceState('oxmysql') == 'started' then
         local license = nil
         for _, id in ipairs(GetPlayerIdentifiers(src)) do
@@ -73,7 +94,7 @@ local function GetCharacterName(source, callback)
                 { license },
                 function(result)
                     if result and result.charname and result.charname:match('%S') then
-                        callback(result.charname:gsub('^%s*(.-)%s*$', '%1'))
+                        callback(trimmed(result.charname))
                     else
                         callback(fallback)
                     end

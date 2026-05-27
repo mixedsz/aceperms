@@ -116,7 +116,7 @@ body {
   display         : flex;
   align-items     : center;
   justify-content : center;
-  font-size       : 16px;
+  color           : var(--accent);
   flex-shrink     : 0;
 }
 
@@ -764,7 +764,6 @@ body {
   display         : flex;
   align-items     : center;
   justify-content : center;
-  font-size       : 20px;
   flex-shrink     : 0;
 }
 
@@ -799,13 +798,13 @@ body {
   display         : flex;
   align-items     : center;
   justify-content : center;
-  font-size       : 24px;
+  color           : var(--gold);
   flex-shrink     : 0;
 }
 .sotm-label  { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--gold); margin-bottom: 4px; }
 .sotm-name   { font-size: 20px; font-weight: 800; color: var(--txt-1); letter-spacing: -.02em; margin-bottom: 2px; }
 .sotm-stat   { font-size: 12px; color: var(--txt-2); }
-.sotm-badge  { margin-left: auto; font-size: 36px; flex-shrink: 0; }
+.sotm-badge  { margin-left: auto; flex-shrink: 0; display: flex; align-items: center; opacity: 0.35; }
 
 /* Charts grid */
 .charts-grid {
@@ -1034,7 +1033,7 @@ body {
 .csel-opt:last-child  { border-bottom: none; }
 .csel-opt:hover       { background: var(--bg-card-h); }
 .csel-opt.sel         { background: var(--accent-bg); }
-.csel-opt-icon { width: 30px; height: 30px; background: rgba(255,255,255,.05); border: 1px solid var(--bd-sub); border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.csel-opt-icon { width: 34px; height: 34px; background: var(--accent-bg); border: 1px solid var(--accent-bd); border-radius: var(--r-sm); display: flex; align-items: center; justify-content: center; color: var(--accent); flex-shrink: 0; }
 .csel-opt-lbl  { font-size: 13px; font-weight: 500; color: var(--txt-1); }
 .csel-opt-desc { font-size: 11px; color: var(--txt-3); margin-top: 1px; }
 
