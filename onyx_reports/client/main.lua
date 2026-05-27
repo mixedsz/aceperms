@@ -44,6 +44,11 @@ RegisterNetEvent('onyx_reports:reportUpdated', function(report)
     SendNUIMessage({ action = 'reportUpdated', report = report })
 end)
 
+RegisterNetEvent('onyx_reports:reportDeleted', function(reportId)
+    if not UIOpen then return end
+    SendNUIMessage({ action = 'reportDeleted', reportId = reportId })
+end)
+
 RegisterNetEvent('onyx_reports:receiveMessage', function(reportId, msgData)
     if UIOpen then
         SendNUIMessage({ action = 'receiveMessage', reportId = reportId, message = msgData })
@@ -102,6 +107,11 @@ end)
 
 RegisterNUICallback('setPriority', function(data, cb)
     TriggerServerEvent('onyx_reports:setPriority', data.reportId, data.priority)
+    cb({ ok = true })
+end)
+
+RegisterNUICallback('deleteReport', function(data, cb)
+    TriggerServerEvent('onyx_reports:deleteReport', data.reportId)
     cb({ ok = true })
 end)
 

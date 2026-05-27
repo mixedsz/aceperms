@@ -31,30 +31,32 @@ local function GetCharacterName(source, callback)
         return s and s:gsub('^%s*(.-)%s*$', '%1') or ''
     end
 
-    -- ESX — try multiple approaches in order
+    -- ESX — direct property access (per ESX docs: xPlayer.firstName / xPlayer.lastName)
     if FrameworkName == 'esx' and Framework then
         local xPlayer = Framework.GetPlayerFromId(src)
         if xPlayer then
-            -- Try getName() (available in some ESX builds)
-            if xPlayer.getName then
-                local n = xPlayer.getName()
-                if n and trimmed(n) ~= '' then callback(trimmed(n)) return end
+            -- 1. Direct properties (ESX standard, documented)
+            local fn = xPlayer.firstName
+            local ln = xPlayer.lastName or ''
+            if fn and fn ~= '' then
+                callback(trimmed(fn .. ' ' .. ln))
+                return
             end
-            -- Try get('firstName') / get('lastName')
-            if xPlayer.get then
-                local fn = xPlayer.get('firstName')
-                local ln = xPlayer.get('lastName') or ''
-                if fn and fn ~= '' then
-                    callback(trimmed(fn .. ' ' .. ln))
+            -- 2. variables table (set via xPlayer.set on server)
+            if xPlayer.variables then
+                local fn2 = xPlayer.variables.firstName
+                local ln2 = xPlayer.variables.lastName or ''
+                if fn2 and fn2 ~= '' then
+                    callback(trimmed(fn2 .. ' ' .. ln2))
                     return
                 end
             end
-            -- Try variables table directly
-            if xPlayer.variables then
-                local fn = xPlayer.variables.firstName
-                local ln = xPlayer.variables.lastName or ''
-                if fn and fn ~= '' then
-                    callback(trimmed(fn .. ' ' .. ln))
+            -- 3. get() accessor fallback
+            if xPlayer.get then
+                local fn3 = xPlayer.get('firstName')
+                local ln3 = xPlayer.get('lastName') or ''
+                if fn3 and fn3 ~= '' then
+                    callback(trimmed(fn3 .. ' ' .. ln3))
                     return
                 end
             end
@@ -354,6 +356,18 @@ RegisterNetEvent('onyx_reports:setPriority', function(reportId, priority)
 
     report.priority = priority
     TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
+end)
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Delete report — removes from memory, fires reportDeleted to all clients
+-- ─────────────────────────────────────────────────────────────────────────────
+RegisterNetEvent('onyx_reports:deleteReport', function(reportId)
+    local src = tonumber(source)
+    if not IsAdmin(src) then return end
+
+    if not Reports[reportId] then return end
+    Reports[reportId] = nil
+    TriggerClientEvent('onyx_reports:reportDeleted', -1, reportId)
 end)
 
 -- ─────────────────────────────────────────────────────────────────────────────

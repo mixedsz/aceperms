@@ -114,6 +114,7 @@ window.addEventListener('message', ({ data }) => {
     case 'setThemeColor':      applyThemeColor(data.color);              break;
     case 'adminNotification':  showAdminToast(data.data);                break;
     case 'notify':             showUserToast(data.message, data.nType);  break;
+    case 'reportDeleted':      onReportDeleted(data.reportId);           break;
   }
 });
 
@@ -386,7 +387,7 @@ function buildCard(r, mode) {
   el.innerHTML = `
     <div class="rc-top">
       <span class="rc-id">${esc(r.id)}</span>
-      <span class="pill pill-${prio}">${priorityLabel(prio)}</span>
+      ${r.status !== 'closed' ? `<span class="pill pill-${prio}">${priorityLabel(prio)}</span>` : ''}
       <span class="pill pill-${r.status}">${statusLabel(r.status)}</span>
     </div>
     <div class="rc-title">${esc(r.categoryLabel ?? r.category)}</div>
@@ -443,15 +444,21 @@ function renderAdminDetail(r) {
   const prio   = r.priority ?? 'normal';
   const online = r.playerOnline !== false;
 
-  // Badges
+  // Badges — hide priority on resolved reports
   document.getElementById('d-badges').innerHTML = `
     <span class="pill pill-${r.status}">${statusLabel(r.status)}</span>
-    <span class="pill pill-${prio}">${priorityLabel(prio)}</span>
+    ${r.status !== 'closed' ? `<span class="pill pill-${prio}">${priorityLabel(prio)}</span>` : ''}
     <span class="pill pill-cat">${esc(r.categoryLabel ?? r.category)}</span>`;
 
-  // Priority selector — set current label and wire dropdown
-  document.getElementById('prio-label').textContent = priorityLabel(prio);
-  wirePrioDropdown(r.id);
+  // Priority selector — hide on closed reports
+  const prioSel = document.getElementById('prio-sel');
+  if (r.status === 'closed') {
+    prioSel.style.display = 'none';
+  } else {
+    prioSel.style.display = '';
+    document.getElementById('prio-label').textContent = priorityLabel(prio);
+    wirePrioDropdown(r.id);
+  }
 
   // Title
   document.getElementById('d-title').textContent =
@@ -506,7 +513,7 @@ function renderAdminDetail(r) {
 
   btnClaim.onclick   = () => { if (r.status === 'open') openClaimPrompt(r.id); };
   btnResolve.onclick = () => { if (r.status !== 'closed') openClosePrompt(r.id); };
-  btnDelete.onclick  = () => { nuiFetch('closeReport', { reportId: r.id, reason: 'Deleted by staff' }); };
+  btnDelete.onclick  = () => { nuiFetch('deleteReport', { reportId: r.id }); };
 }
 
 /* ── Priority dropdown wiring ─────────────────── */
@@ -918,6 +925,19 @@ document.getElementById('cp-confirm').addEventListener('click', () => {
 function onReportCreated(r) {
   S.allReports[r.id] = r;
   if (S.activeTab === 'admin') renderAdminList();
+}
+
+function onReportDeleted(id) {
+  delete S.allReports[id];
+  delete S.myReports[id];
+  if (S.selectedAdmin === id) {
+    S.selectedAdmin = null;
+    document.getElementById('admin-empty')         .classList.remove('hidden');
+    document.getElementById('admin-detail-content').classList.add('hidden');
+  }
+  if (S.selectedMy === id) S.selectedMy = null;
+  if (S.activeTab === 'admin')      renderAdminList();
+  if (S.activeTab === 'my-reports') renderMyList();
 }
 
 function onYourReportCreated(r) {
