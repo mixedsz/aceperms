@@ -117,6 +117,6 @@ Config.Locale = {
     not_authorized    = 'You are not authorised to use this command.',
     desc_too_short    = 'Please provide a description.',
     staff_message     = 'Staff message from %s: %s',
-    report_closed_msg = 'Your report has been closed. Reason: %s',
+    report_closed_msg = 'Your report has been resolved. Reason: %s',
     report_handled    = 'A staff member has picked up your report.',
 }

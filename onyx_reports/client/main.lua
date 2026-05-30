@@ -50,10 +50,11 @@ RegisterNetEvent('onyx_reports:reportDeleted', function(reportId)
 end)
 
 RegisterNetEvent('onyx_reports:receiveMessage', function(reportId, msgData)
-    if UIOpen then
-        SendNUIMessage({ action = 'receiveMessage', reportId = reportId, message = msgData })
+    if not UIOpen then
+        -- Only notify when the player doesn't have /report open.
+        -- When it is open the message appears live in the Chat tab via reportUpdated.
+        Notify(Config.Locale.staff_message:format(msgData.sender, msgData.message), 'inform')
     end
-    Notify(Config.Locale.staff_message:format(msgData.sender, msgData.message), 'inform')
 end)
 
 RegisterNetEvent('onyx_reports:notify', function(msg, nType)

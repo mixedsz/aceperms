@@ -223,10 +223,22 @@ function openPanel(data) {
   document.querySelectorAll('.admin-only').forEach(el =>
     el.classList.toggle('hidden', !S.isAdmin));
 
-  S.allReports = {};
-  S.myReports  = {};
+  S.allReports    = {};
+  S.myReports     = {};
+  S.selectedMy    = null;
+  S.selectedAdmin = null;
   (data.reports ?? []).forEach(r => { S.allReports[r.id] = r; });
   if (data.myReports) data.myReports.forEach(r => { S.myReports[r.id] = r; });
+
+  // Reset detail panes so stale content from a prior session isn't visible
+  const myContent = document.getElementById('my-detail-content');
+  const myEmpty   = document.getElementById('my-empty');
+  if (myContent) myContent.classList.add('hidden');
+  if (myEmpty)   myEmpty.classList.remove('hidden');
+  const admContent = document.getElementById('admin-detail-content');
+  const admEmpty   = document.getElementById('admin-empty');
+  if (admContent) admContent.classList.add('hidden');
+  if (admEmpty)   admEmpty.classList.remove('hidden');
 
   switchTab(S.activeTab);
   document.getElementById('main-panel').classList.remove('hidden');
@@ -954,7 +966,7 @@ function onReportCreated(r) {
 }
 
 function onReportDeleted(id) {
-  // Mark as deleted but KEEP in S.allReports so statistics still count it
+  // Keep in state for statistics but mark deleted so lists filter it out
   if (S.allReports[id]) S.allReports[id].deleted = true;
   if (S.myReports[id])  S.myReports[id].deleted  = true;
 
@@ -963,7 +975,11 @@ function onReportDeleted(id) {
     document.getElementById('admin-empty')         .classList.remove('hidden');
     document.getElementById('admin-detail-content').classList.add('hidden');
   }
-  if (S.selectedMy === id) S.selectedMy = null;
+  if (S.selectedMy === id) {
+    S.selectedMy = null;
+    document.getElementById('my-empty')         .classList.remove('hidden');
+    document.getElementById('my-detail-content').classList.add('hidden');
+  }
   if (S.activeTab === 'admin')      renderAdminList();
   if (S.activeTab === 'my-reports') renderMyList();
 }

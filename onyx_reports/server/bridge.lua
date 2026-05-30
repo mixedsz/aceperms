@@ -1,8 +1,9 @@
 -- Server-side framework bridge
 -- Provides IsAdmin(), NotifyPlayer(), NotifyAdmins()
 
-local Framework     = nil
-local FrameworkName = nil
+-- Must be globals so server/main.lua (GetCharacterName) can read them
+Framework     = nil
+FrameworkName = nil
 
 local function DetectFramework()
     if Config.Framework ~= 'auto' then

@@ -31,32 +31,33 @@ local function GetCharacterName(source, callback)
         return s and s:gsub('^%s*(.-)%s*$', '%1') or ''
     end
 
-    -- ESX — direct property access (per ESX docs: xPlayer.firstName / xPlayer.lastName)
+    -- ESX — try every known property shape across all common ESX versions
     if FrameworkName == 'esx' and Framework then
-        local xPlayer = Framework.GetPlayerFromId(src)
-        if xPlayer then
-            -- 1. Direct properties (ESX standard, documented)
-            local fn = xPlayer.firstName
-            local ln = xPlayer.lastName or ''
-            if fn and fn ~= '' then
-                callback(trimmed(fn .. ' ' .. ln))
-                return
+        local ok, xPlayer = pcall(function() return Framework.GetPlayerFromId(src) end)
+        if ok and xPlayer then
+            -- 1. charinfo table (ESX Legacy / esx_identity newer builds)
+            if xPlayer.charinfo then
+                local ci = xPlayer.charinfo
+                local fn = ci.firstname or ci.firstName or ''
+                local ln = ci.lastname  or ci.lastName  or ''
+                if fn ~= '' then callback(trimmed(fn .. ' ' .. ln)) return end
             end
-            -- 2. variables table (set via xPlayer.set on server)
+            -- 2. Direct properties
+            local fn = xPlayer.firstName or xPlayer.firstname
+            local ln = xPlayer.lastName  or xPlayer.lastname or ''
+            if fn and fn ~= '' then callback(trimmed(fn .. ' ' .. ln)) return end
+            -- 3. variables table
             if xPlayer.variables then
-                local fn2 = xPlayer.variables.firstName
-                local ln2 = xPlayer.variables.lastName or ''
-                if fn2 and fn2 ~= '' then
-                    callback(trimmed(fn2 .. ' ' .. ln2))
-                    return
-                end
+                local fn2 = xPlayer.variables.firstName or xPlayer.variables.firstname or ''
+                local ln2 = xPlayer.variables.lastName  or xPlayer.variables.lastname  or ''
+                if fn2 ~= '' then callback(trimmed(fn2 .. ' ' .. ln2)) return end
             end
-            -- 3. get() accessor fallback
+            -- 4. get() accessor
             if xPlayer.get then
-                local fn3 = xPlayer.get('firstName')
-                local ln3 = xPlayer.get('lastName') or ''
-                if fn3 and fn3 ~= '' then
-                    callback(trimmed(fn3 .. ' ' .. ln3))
+                local ok2, fn3 = pcall(xPlayer.get, 'firstName')
+                if ok2 and fn3 and fn3 ~= '' then
+                    local ok3, ln3 = pcall(xPlayer.get, 'lastName')
+                    callback(trimmed(fn3 .. ' ' .. (ok3 and ln3 or '')))
                     return
                 end
             end
@@ -140,7 +141,7 @@ RegisterCommand(Config.Commands.user, function(source)
 
     local mine = {}
     for _, r in pairs(Reports) do
-        if r.source == src then mine[#mine + 1] = r end
+        if r.source == src and not r.deleted then mine[#mine + 1] = r end
     end
 
     TriggerClientEvent('onyx_reports:openPanel', src, {
@@ -288,7 +289,7 @@ RegisterNetEvent('onyx_reports:closeReport', function(reportId, reason)
         TriggerClientEvent('onyx_reports:reportUpdated', -1, report)
 
         if report.source and IsPlayerConnected(report.source) then
-            NotifyPlayer(report.source, Config.Locale.report_closed_msg:format(report.closeReason), 'inform')
+            NotifyPlayer(report.source, Config.Locale.report_closed_msg:format(report.closeReason), 'success')
         end
     end)
 end)
