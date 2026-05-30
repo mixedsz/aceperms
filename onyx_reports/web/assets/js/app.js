@@ -263,10 +263,21 @@ function switchTab(tab) {
     case 'my-reports':
       document.getElementById('view-my-reports').classList.remove('hidden');
       renderMyList();
+      // Re-render the selected report's messages so anything that arrived
+      // while on another tab is visible immediately on switch-back
+      if (S.selectedMy) {
+        const rm = S.myReports[S.selectedMy];
+        if (rm) renderMyReportMessages(rm);
+      }
       break;
     case 'admin':
       document.getElementById('view-admin').classList.remove('hidden');
       renderAdminList();
+      // Re-render selected report detail so updates that arrived on another tab show
+      if (S.selectedAdmin) {
+        const ra = S.allReports[S.selectedAdmin];
+        if (ra) renderAdminDetail(ra);
+      }
       break;
     case 'stats':
       document.getElementById('view-stats').classList.remove('hidden');
@@ -558,34 +569,35 @@ function renderAdminDetail(r) {
 function wirePrioDropdown(reportId) {
   const trigger = document.getElementById('prio-trigger');
   const menu    = document.getElementById('prio-menu');
+  if (!trigger || !menu) return;
 
-  // Clone to remove old listeners
+  // Clone both elements to wipe all accumulated event listeners
   const newTrigger = trigger.cloneNode(true);
   trigger.parentNode.replaceChild(newTrigger, trigger);
+  const newMenu = menu.cloneNode(true);
+  menu.parentNode.replaceChild(newMenu, menu);
 
   newTrigger.addEventListener('click', e => {
     e.stopPropagation();
-    menu.classList.toggle('hidden');
+    newMenu.classList.toggle('hidden');
   });
 
-  menu.querySelectorAll('.prio-opt').forEach(opt => {
+  newMenu.querySelectorAll('.prio-opt').forEach(opt => {
     opt.addEventListener('click', e => {
       e.stopPropagation();
       const newPrio = opt.dataset.prio;
       nuiFetch('setPriority', { reportId, priority: newPrio });
       document.getElementById('prio-label').textContent = priorityLabel(newPrio);
-      menu.classList.add('hidden');
+      newMenu.classList.add('hidden');
     });
   });
 }
 
-// Close prio menu on outside click
+// Close prio menu on outside click (re-query each time so clone-and-replace is respected)
 document.addEventListener('click', e => {
   const prioSel = document.getElementById('prio-sel');
   const menu    = document.getElementById('prio-menu');
-  if (prioSel && menu && !prioSel.contains(e.target)) {
-    menu.classList.add('hidden');
-  }
+  if (prioSel && menu && !prioSel.contains(e.target)) menu.classList.add('hidden');
 });
 
 /* ── Message tabs ─────────────────────────────── */
@@ -993,21 +1005,26 @@ function onReportUpdated(r) {
   S.allReports[r.id] = r;
   if (S.myReports[r.id] !== undefined) S.myReports[r.id] = r;
 
+  // Always push message updates to whichever pane is currently visible,
+  // regardless of active tab, so nothing is missed when tabs differ.
+  if (S.selectedAdmin === r.id) {
+    renderChatList(r);
+    renderNotesList(r);
+  }
+  if (S.selectedMy === r.id) {
+    renderMyReportMessages(r);
+    if (r.status === 'closed') {
+      const c = document.querySelector('#my-detail-content .msg-composer');
+      if (c) c.remove();
+    }
+  }
+
+  // Full re-renders for status / priority / button state changes
   if (S.activeTab === 'admin') {
     renderAdminList();
     if (S.selectedAdmin === r.id) renderAdminDetail(r);
   } else if (S.activeTab === 'my-reports') {
     renderMyList();
-    if (S.selectedMy === r.id) {
-      // Update the message list in-place — does NOT touch the composer,
-      // so the player keeps focus and any text they're typing is preserved.
-      renderMyReportMessages(r);
-      // If the report was just closed, remove the reply composer
-      if (r.status === 'closed') {
-        const c = document.querySelector('#my-detail-content .msg-composer');
-        if (c) c.remove();
-      }
-    }
   }
 }
 
