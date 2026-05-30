@@ -982,29 +982,46 @@ function onReportUpdated(r) {
     if (S.selectedAdmin === r.id) renderAdminDetail(r);
   } else if (S.activeTab === 'my-reports') {
     renderMyList();
-    if (S.selectedMy === r.id) selectMyReport(r.id);
+    if (S.selectedMy === r.id) {
+      // Update the message list in-place — does NOT touch the composer,
+      // so the player keeps focus and any text they're typing is preserved.
+      renderMyReportMessages(r);
+      // If the report was just closed, remove the reply composer
+      if (r.status === 'closed') {
+        const c = document.querySelector('#my-detail-content .msg-composer');
+        if (c) c.remove();
+      }
+    }
   }
 }
 
+// Renders only the message list inside the My Reports detail pane.
+// Intentionally leaves the composer untouched so the player can keep typing.
+function renderMyReportMessages(r) {
+  const list = document.getElementById('my-chat-list');
+  if (!list) return;
+  const msgs = r.messages ?? [];
+  if (msgs.length === 0) {
+    list.innerHTML = '<span class="no-msgs">No messages yet — a staff member will reply shortly</span>';
+    return;
+  }
+  list.innerHTML = '';
+  msgs.forEach(m => {
+    const b = document.createElement('div');
+    b.className = `msg-bubble ${m.senderType}`;
+    b.innerHTML = `<div class="bubble-meta">${esc(m.sender)}<span class="bubble-time">${fmtTime(m.timestamp)}</span></div>${esc(m.message)}`;
+    list.appendChild(b);
+  });
+  list.scrollTop = list.scrollHeight;
+}
+
 function onReceiveMsg(reportId, msgData) {
-  const r = S.allReports[reportId] ?? S.myReports[reportId];
-  if (!r) return;
-  r.messages = r.messages ?? [];
-  r.messages.push(msgData);
-  if (S.selectedAdmin === reportId && S.activeTab === 'admin') {
-    renderChatList(r);
-  }
-  if (S.selectedMy === reportId && S.activeTab === 'my-reports') {
-    // Append to existing chat list without full re-render (preserves composer focus)
-    const list = document.getElementById('my-chat-list');
-    if (list) {
-      const b = document.createElement('div');
-      b.className = `msg-bubble ${msgData.senderType}`;
-      b.innerHTML = `<div class="bubble-meta">${esc(msgData.sender)}<span class="bubble-time">${fmtTime(msgData.timestamp)}</span></div>${esc(msgData.message)}`;
-      list.appendChild(b);
-      list.scrollTop = list.scrollHeight;
-    }
-  }
+  // Admin panel is kept in sync exclusively by onReportUpdated → renderAdminDetail.
+  // Adding a second render path here causes duplicates when both reportUpdated and
+  // receiveMessage arrive for the same message (race-condition order not guaranteed).
+  // My-reports updates also flow through onReportUpdated → renderMyReportMessages.
+  // receiveMessage is kept in client/main.lua only for the notification toast (Notify call).
+  void reportId; void msgData;
 }
 
 
